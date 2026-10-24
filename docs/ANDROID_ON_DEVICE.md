@@ -48,7 +48,7 @@ Install the repository's required Python version in this userland with uv:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh
-less /tmp/uv-install.sh
+sed -n '1,220p' /tmp/uv-install.sh
 sh /tmp/uv-install.sh
 . "$HOME/.local/bin/env"
 uv python install 3.12
