@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">ARTEMIS Runtime</string>
-    <string name="accessibility_service_description">Lightweight non-exclusive accessibility helper for Artemis UI automation and testing.</string>
+    <string name="accessibility_service_description">ARTEMIS Runtime screen inspection and UI-control service. Requires user-enabled accessibility access.</string>
 </resources>
