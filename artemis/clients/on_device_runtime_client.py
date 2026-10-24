@@ -119,6 +119,38 @@ class OnDeviceRuntimeClient(AccessibilityClient):
             f"127.0.0.1:{self._session.local_port}."
         )
 
+    def get_screen_data(self):
+        """Capture a screen snapshot without ever falling back to host-side ADB."""
+        from third_party.mobile_use.clients.ui_automator_client import UIAutomatorScreenData
+
+        snapshot = self._snapshot()
+        xml, elements = self._elements_from_dump(snapshot)
+        if not snapshot.get("has_screenshot") or not snapshot.get("screenshot_base64"):
+            reason = snapshot.get("screenshot_error") or "the runtime returned no screenshot"
+            raise RuntimeError(
+                "The phone-local Runtime could not capture a screenshot: "
+                f"{reason}. This mode requires Android 11+ screenshot access."
+            )
+        width, height = _dimensions(snapshot)
+        return UIAutomatorScreenData(
+            base64=str(snapshot["screenshot_base64"]),
+            hierarchy_xml=xml,
+            elements=elements,
+            width=width,
+            height=height,
+        )
+
+    def get_screenshot(self):
+        """Return a screenshot from the phone-local service, never via ADB."""
+        from io import BytesIO
+        from PIL import Image
+
+        snapshot = self._snapshot()
+        if not snapshot.get("has_screenshot") or not snapshot.get("screenshot_base64"):
+            return None
+        import base64
+        return Image.open(BytesIO(base64.b64decode(snapshot["screenshot_base64"]))).copy()
+
     def _ensure_session(self) -> HelperSession:
         if self._session is None:
             self.connect()
