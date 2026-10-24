@@ -42,6 +42,7 @@ from typing import Any
 from PIL import Image
 
 from artemis.clients.accessibility_client import AccessibilityClient, HelperUnavailable
+from artemis.clients.on_device_runtime_client import OnDeviceRuntimeClient
 from artemis.config.constants import ENV_ARTEMIS_HIERARCHY_BACKEND
 from artemis.runtime.adb_endpoint import adb_command
 from artemis.runtime.helper_manager import ProvisionEvent
