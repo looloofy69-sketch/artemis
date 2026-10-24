@@ -5,6 +5,7 @@ loopback URL because the Android runtime exposes powerful UI controls. The
 phone-generated bearer token is required; this path does not use adb forward,
 adb pairing, or the host-side helper-token broadcast.
 """
+
 from __future__ import annotations
 
 import json
@@ -14,8 +15,9 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from artemis.clients.accessibility_client import AccessibilityClient, HelperUnavailable
+from artemis.clients.accessibility_client import AccessibilityClient, HelperUnavailable, _dimensions
 from artemis.runtime.helper_manager import HelperSession
+from third_party.mobile_use.clients.ui_automator_client import UIAutomatorScreenData
 from third_party.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -115,13 +117,11 @@ class OnDeviceRuntimeClient(AccessibilityClient):
             self._session = None
             raise HelperUnavailable("ARTEMIS Runtime did not confirm its capabilities.")
         logger.info(
-            "Connected to the phone-local ARTEMIS Runtime at "
-            f"127.0.0.1:{self._session.local_port}."
+            f"Connected to the phone-local ARTEMIS Runtime at 127.0.0.1:{self._session.local_port}."
         )
 
-    def get_screen_data(self):
+    def get_screen_data(self) -> UIAutomatorScreenData:
         """Capture a screen snapshot without ever falling back to host-side ADB."""
-        from third_party.mobile_use.clients.ui_automator_client import UIAutomatorScreenData
 
         snapshot = self._snapshot()
         xml, elements = self._elements_from_dump(snapshot)
@@ -142,13 +142,13 @@ class OnDeviceRuntimeClient(AccessibilityClient):
 
     def get_screenshot(self):
         """Return a screenshot from the phone-local service, never via ADB."""
+        import base64
         from io import BytesIO
         from PIL import Image
 
         snapshot = self._snapshot()
         if not snapshot.get("has_screenshot") or not snapshot.get("screenshot_base64"):
             return None
-        import base64
         return Image.open(BytesIO(base64.b64decode(snapshot["screenshot_base64"]))).copy()
 
     def _ensure_session(self) -> HelperSession:
