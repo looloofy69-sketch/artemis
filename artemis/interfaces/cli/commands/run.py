@@ -137,6 +137,8 @@ async def execute_task(
     target_serial = (
         device_serial or settings.ADB_DEVICE_SERIAL or os.environ.get("ADB_DEVICE_SERIAL")
     )
+    if not target_serial and os.environ.get("ARTEMIS_ON_DEVICE_RUNTIME") == "1":
+        target_serial = os.environ.get("ARTEMIS_RUNTIME_DEVICE_ID", "artemis-runtime")
     if not target_serial:
         try:
             from artemis.runtime import device_pool
