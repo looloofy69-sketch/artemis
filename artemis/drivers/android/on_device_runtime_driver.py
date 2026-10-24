@@ -44,6 +44,27 @@ class OnDeviceRuntimeDriver(AndroidAdbDriver):
         await asyncio.to_thread(self.runtime_client.connect)
         logger.info("Connected using phone-local ARTEMIS Runtime; no ADB device is required.")
 
+    async def get_screen_data(self, skip_settling: bool = False) -> ScreenData:
+        """Return a screenshot and hierarchy exclusively from the on-device Runtime."""
+        import base64
+        import time
+
+        if not skip_settling:
+            await asyncio.sleep(0.25)
+        raw = await asyncio.to_thread(self.runtime_client.get_screen_data)
+        image_bytes = base64.b64decode(raw.base64, validate=True)
+        self._width, self._height = int(raw.width), int(raw.height)
+        return ScreenData(
+            screenshot_bytes=image_bytes,
+            screenshot_base64=raw.base64,
+            ui_hierarchy_xml=raw.hierarchy_xml,
+            ui_elements=list(raw.elements or []),
+            width=self._width,
+            height=self._height,
+            timestamp=time.time(),
+            platform="android",
+        )
+
     async def disconnect(self) -> None:
         if self._ui_adb_client is not None:
             await asyncio.to_thread(self._ui_adb_client.disconnect)
