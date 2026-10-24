@@ -4,6 +4,7 @@ Core UI interactions use the native AccessibilityService endpoint. Shell command
 are available only when Root Mode is explicitly enabled in the runtime app on a
 rooted device. Screen video recording is intentionally unsupported in this mode.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -25,8 +26,14 @@ logger = get_logger(__name__)
 class OnDeviceRuntimeDriver(AndroidAdbDriver):
     """Driver that uses ARTEMIS Runtime's local HTTP API instead of ADB actions."""
 
-    def __init__(self, device_id: str, adb_client: Any, ui_adb_client: Any = None,
-                 width: int = 1080, height: int = 2340):
+    def __init__(
+        self,
+        device_id: str,
+        adb_client: Any,
+        ui_adb_client: Any = None,
+        width: int = 1080,
+        height: int = 2340,
+    ):
         runtime_client = ui_adb_client or OnDeviceRuntimeClient(device_id)
         super().__init__(
             device_id=device_id,
@@ -69,12 +76,15 @@ class OnDeviceRuntimeDriver(AndroidAdbDriver):
         if self._ui_adb_client is not None:
             await asyncio.to_thread(self._ui_adb_client.disconnect)
 
-    async def tap(self, x: int, y: int, duration_ms: int = 100,
-                  times: int = 1, delay_ms: int = 100) -> bool:
+    async def tap(
+        self, x: int, y: int, duration_ms: int = 100, times: int = 1, delay_ms: int = 100
+    ) -> bool:
         if duration_ms >= 500:
-            return bool(self.runtime_client._rpc(
-                "long_press", {"x": x, "y": y, "duration": min(duration_ms, 5000)}
-            ))
+            return bool(
+                self.runtime_client._rpc(
+                    "long_press", {"x": x, "y": y, "duration": min(duration_ms, 5000)}
+                )
+            )
         for index in range(max(1, min(times, 10))):
             if not self.runtime_client.tap(x, y):
                 return False
@@ -83,12 +93,15 @@ class OnDeviceRuntimeDriver(AndroidAdbDriver):
         return True
 
     async def long_press(self, x: int, y: int, duration_ms: int = 1000) -> bool:
-        return bool(self.runtime_client._rpc(
-            "long_press", {"x": x, "y": y, "duration": min(max(duration_ms, 500), 5000)}
-        ))
+        return bool(
+            self.runtime_client._rpc(
+                "long_press", {"x": x, "y": y, "duration": min(max(duration_ms, 500), 5000)}
+            )
+        )
 
-    async def swipe(self, start_x: int, start_y: int, end_x: int, end_y: int,
-                    duration_ms: int = 800) -> bool:
+    async def swipe(
+        self, start_x: int, start_y: int, end_x: int, end_y: int, duration_ms: int = 800
+    ) -> bool:
         return bool(self.runtime_client.swipe(start_x, start_y, end_x, end_y, duration_ms))
 
     async def input_text(self, text: str, clear_existing: bool = True) -> bool:
@@ -134,9 +147,14 @@ class OnDeviceRuntimeDriver(AndroidAdbDriver):
 
     async def execute_shell(self, command: str, timeout_seconds: float = 15.0) -> str:
         # This endpoint rejects requests unless Root Mode has been explicitly enabled in the app.
-        payload = {"command": command, "timeout_ms": int(max(250, min(timeout_seconds, 10.0)) * 1000)}
+        payload = {
+            "command": command,
+            "timeout_ms": int(max(250, min(timeout_seconds, 10.0)) * 1000),
+        }
         try:
-            raw = self.runtime_client._http("/root/exec", payload=payload, timeout=timeout_seconds + 2)
+            raw = self.runtime_client._http(
+                "/root/exec", payload=payload, timeout=timeout_seconds + 2
+            )
             response = json.loads(raw.decode("utf-8"))
             if not response.get("success"):
                 return f"Error: {response.get('error') or response.get('output') or 'root command failed'}"
