@@ -163,11 +163,11 @@ public class ArtemisAccessibilityService extends AccessibilityService {
                     .setContentText("Lets ARTEMIS inspect and control this device with your permission. "
                             + "Remove with: artemis helper uninstall")
                     .setStyle(new Notification.BigTextStyle().bigText(
-                            "Installed by Artemis to read the screen layout during automated "
-                            + "tests. It answers only on this device (127.0.0.1:" + DEFAULT_PORT
-                            + "), only to the computer that is connected over USB debugging and "
-                            + "holds the session token, and it sends nothing anywhere. Remove it "
-                            + "any time with `artemis helper uninstall` or from Settings > Apps."))
+                            "ARTEMIS Runtime provides local screen inspection and UI actions on "
+                            + "this phone at 127.0.0.1:" + DEFAULT_PORT
+                            + ". Requests require the local pairing token. This app does not "
+                            + "send screen content to a remote service. Remove it from Settings > "
+                            + "Apps whenever you no longer need it."))
                     .setSmallIcon(android.R.drawable.stat_notify_sync)
                     .setOngoing(true);
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
