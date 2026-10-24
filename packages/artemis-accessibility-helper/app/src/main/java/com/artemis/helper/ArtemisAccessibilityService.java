@@ -108,7 +108,10 @@ public class ArtemisAccessibilityService extends AccessibilityService {
             Log.w(TAG, "Failed to dynamically configure AccessibilityServiceInfo", t);
         }
 
-        // Phone-only mode: create/load the private pairing token even when no ADB host exists.\n        TokenStore.initialize(this);\n\n        // 3. Start local loopback command server
+        // Phone-only mode: create/load the private pairing token even when no ADB host exists.
+        TokenStore.initialize(this);
+
+        // 3. Start local loopback command server
         if (server != null) {
             server.shutdown();
             server = null;
