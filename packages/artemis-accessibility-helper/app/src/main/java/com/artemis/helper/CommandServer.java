@@ -379,6 +379,43 @@ public class CommandServer extends Thread {
                     long dur = params.optLong("duration", 300L);
                     resp.put("success", GestureController.swipe(service, x1, y1, x2, y2, dur, 3000L));
                     break;
+                case "launch_app": {
+                    String packageName = params.optString("package", "").trim();
+                    if (!packageName.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) {
+                        resp.put("success", false);
+                        resp.put("error", "Invalid package name");
+                        break;
+                    }
+                    android.content.Intent launch =
+                            service.getPackageManager().getLaunchIntentForPackage(packageName);
+                    if (launch == null) {
+                        resp.put("success", false);
+                        resp.put("error", "No launchable activity for package " + packageName);
+                    } else {
+                        launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                | android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                        service.startActivity(launch);
+                        resp.put("success", true);
+                    }
+                    break;
+                }
+                case "stop_app": {
+                    String packageName = params.optString("package", "").trim();
+                    if (!packageName.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) {
+                        resp.put("success", false);
+                        resp.put("error", "Invalid package name");
+                        break;
+                    }
+                    RootExecutor.ExecResult stopped = RootExecutor.executeAuthorized(
+                            service, "am force-stop " + packageName, 2500L);
+                    resp.put("success", !stopped.timedOut && stopped.exitCode == 0);
+                    if (stopped.error != null && !stopped.error.isEmpty()) {
+                        resp.put("error", stopped.error);
+                    } else if (stopped.exitCode != 0) {
+                        resp.put("error", "Stopping an app requires ARTEMIS Root Mode on a rooted device.");
+                    }
+                    break;
+                }
                 case "type":
                     String text = params.optString("text", "");
                     boolean append = params.optBoolean("append", false);
