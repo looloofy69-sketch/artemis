@@ -176,6 +176,7 @@ public class CommandServer extends Thread {
     private void handleHttp(String requestLine, InputStream in, OutputStream output) {
         try {
             String[] parts = requestLine.split(" ");
+            String method = parts.length > 0 ? parts[0].toUpperCase(Locale.ROOT) : "";
             String target = parts.length > 1 ? parts[1] : "/";
             String path = target;
             Map<String, String> query;
@@ -224,6 +225,38 @@ public class CommandServer extends Thread {
             }
             if (!authed) {
                 sendJson(output, 401, unauthorizedJson().toString());
+                return;
+            }
+
+            // Authenticated capability discovery. This endpoint does not elevate permissions.
+            if (path.equals("/capabilities")) {
+                sendJson(output, 200,
+                        RootExecutor.capabilities(service, service != null).toString());
+                return;
+            }
+
+            // Privileged operation requires BOTH the local pairing token and an explicit
+            // Root Mode opt-in in the phone UI. No root is granted on stock Android.
+            if (path.equals("/root/exec")) {
+                if (!"POST".equals(method)) {
+                    sendJson(output, 405, errorJson("POST required").toString());
+                    return;
+                }
+                JSONObject request = body.isEmpty() ? new JSONObject() : new JSONObject(body);
+                String command = request.optString("command", "");
+                long timeoutMs = request.optLong("timeout_ms", 5000L);
+                RootExecutor.ExecResult result =
+                        RootExecutor.executeAuthorized(service, command, timeoutMs);
+                JSONObject response = new JSONObject();
+                response.put("success", !result.timedOut && result.exitCode == 0);
+                response.put("exit_code", result.exitCode);
+                response.put("timed_out", result.timedOut);
+                response.put("output", result.output);
+                if (result.error != null && !result.error.isEmpty()) {
+                    response.put("error", result.error);
+                }
+                int status = result.timedOut ? 504 : (result.exitCode == 0 ? 200 : 403);
+                sendJson(output, status, response.toString());
                 return;
             }
 
@@ -422,6 +455,9 @@ public class CommandServer extends Thread {
         switch (status) {
             case 200: return "OK";
             case 400: return "Bad Request";
+            case 403: return "Forbidden";
+            case 405: return "Method Not Allowed";
+            case 504: return "Gateway Timeout";
             case 401: return "Unauthorized";
             case 404: return "Not Found";
             case 413: return "Payload Too Large";
