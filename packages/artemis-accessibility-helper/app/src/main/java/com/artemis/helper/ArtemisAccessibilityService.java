@@ -108,7 +108,7 @@ public class ArtemisAccessibilityService extends AccessibilityService {
             Log.w(TAG, "Failed to dynamically configure AccessibilityServiceInfo", t);
         }
 
-        // 3. Start local loopback command server
+        // Phone-only mode: create/load the private pairing token even when no ADB host exists.\n        TokenStore.initialize(this);\n\n        // 3. Start local loopback command server
         if (server != null) {
             server.shutdown();
             server = null;
@@ -156,8 +156,8 @@ public class ArtemisAccessibilityService extends AccessibilityService {
                 builder = new Notification.Builder(this);
             }
 
-            builder.setContentTitle("Artemis test helper is running")
-                    .setContentText("Lets Artemis read this screen during automated tests. "
+            builder.setContentTitle("ARTEMIS Runtime is running")
+                    .setContentText("Lets ARTEMIS inspect and control this device with your permission. "
                             + "Remove with: artemis helper uninstall")
                     .setStyle(new Notification.BigTextStyle().bigText(
                             "Installed by Artemis to read the screen layout during automated "
