@@ -135,3 +135,54 @@ For the web console, build the frontend using the Node version required by `apps
 **Not yet proven by this repository:** a clean install on Termux/Ubuntu PRoot, reliable self-ADB pairing on a specific OEM, long-running stability under Android process management, all media/recording features, and production-grade background operation.
 
 A proper first-party implementation should add a Termux-specific setup path, a dependency profile that separates required runtime packages from desktop-only recording/UI features, ADB self-connection diagnostics, and a real-device acceptance test on supported Android/OEM versions. Do not advertise full Android-host support until those tests pass.
+
+
+## 6. First-party ARTEMIS Runtime APK (phone-local control path)
+
+The repository now contains a native Android runtime app under `packages/artemis-accessibility-helper`. It exposes an authenticated loopback API on `127.0.0.1:18888`, creates its own pairing token on the phone, and supports a direct Python client selected with `ARTEMIS_ON_DEVICE_RUNTIME=1`. This path does **not** depend on ADB pairing to discover a device for routine screen/gesture interactions.
+
+### Get and install the APK
+
+1. Open the repository's Pull Requests page and select the open **ARTEMIS launch-readiness** PR. Open its **Actions** run for `Android Runtime APK` after GitHub Actions finishes.
+2. Download the artifact named `artemis-runtime-debug-apk` and extract `app-debug.apk` on the phone. If the workflow is unavailable or no run exists, Actions may be disabled for the fork; enable Actions in repository Settings and trigger the branch workflow.
+3. Install the APK. Android may ask you to allow installation from the browser/file manager used to download it.
+4. Open **ARTEMIS Runtime** → **Open Accessibility settings** → enable the ARTEMIS Runtime service. Return to the app and tap **Refresh runtime status**. It should report the service as running and display the local API endpoint.
+5. Tap **Copy token**. The token is a credential: do not post it in a public issue, commit it to Git, or include it in screenshots. If you rotate the token, update the environment variable used by the controller.
+
+**Signing note:** the previous public repository included a debug signing keystore. It has been removed from the branch. New CI debug APKs may have a different debug signature; if Android refuses to install the new APK over an older `com.artemis.helper` build, uninstall the old helper first, then install the new APK. Uninstalling clears that app's private preferences and token. This CI artifact is for development/testing, not a production release; a stable release must use a private release-signing key that is not committed to the repository.
+
+### Connect ARTEMIS's Python controller without ADB pairing
+
+Run ARTEMIS inside the same phone-hosted Ubuntu/Termux environment described above. You still need the Python environment and dependencies from `uv sync`, and the `adb` executable must be installed because parts of the existing agent initialization still check for it. In phone-local mode the target device identity is synthetic; no ADB device must be paired.
+
+In the Ubuntu terminal:
+
+```bash
+export ARTEMIS_ON_DEVICE_RUNTIME=1
+export ARTEMIS_RUNTIME_URL=http://127.0.0.1:18888
+export ARTEMIS_RUNTIME_TOKEN='PASTE_THE_TOKEN_COPIED_FROM_ARTEMIS_RUNTIME'
+# Configure one supported model provider, for example:
+export GEMINI_API_KEY='YOUR_PROVIDER_KEY'
+
+uv run artemis run \
+  "Open Settings, read the Android version, and stop without changing anything." \
+  --profile flash \
+  --without-video-recording-tools
+```
+
+Replace both credential placeholders with real values in your private shell. Do not paste API keys or runtime tokens into this documentation or your Git repository. When you close the shell, exported variables are lost unless you store them securely in a local ignored `.env` file.
+
+### Capability tiers
+
+**Stock Android, no root:** the app can use the AccessibilityService APIs after you explicitly enable the service. The intended first tier includes hierarchy/screenshot capture (screenshot API requires Android 11+ and can still be denied), taps, swipes, supported global actions, text/clipboard operations, and launching an installed app. This is not unrestricted system access; password-protected/secure surfaces, OS restrictions, and apps that hide accessibility content remain limitations.
+
+**Rooted Android:** the app offers **Test root access** and a separate **Root Mode** switch. Root Mode is off by default; the user must test/approve the device's existing `su` prompt and then explicitly enable it. Only then can the authenticated local API invoke `su -c` commands. ARTEMIS cannot grant itself root, and the app must never silently enable this tier. An arbitrary root shell can damage the OS or erase user data; enable it only on a device you own and while intentionally supervising the operation.
+
+**True privileged/system-app access:** on stock Android, an ordinary installed APK cannot grant itself signature/privileged permissions. A system-signed or privileged deployment requires a compatible custom/system image and its permission allowlist (or a separately provisioned enterprise device-owner configuration for the device-policy capabilities it supports). The current app does not modify the system partition, unlock the bootloader, root the phone, or bypass Xiaomi/Android security.
+
+### Current prototype limits
+
+- The runtime's direct Python client avoids ADB pairing for its main UI screen/action path, but this integration has **not yet been exercised on a real phone**.
+- The Pro/Flash agent may call other legacy ADB-backed operations; only the core on-device driver path has been redirected. Validate the first read-only task and treat any residual ADB call as a specific gap to fix.
+- Screen video recording via scrcpy and installing other APKs from the Python driver are not provided by phone-local mode yet. Video tools are disabled by the setup command above.
+- A successful APK build is not the same as a successful install, permission grant, loopback connection, or end-to-end automation. Verify each milestone separately.
