@@ -45,7 +45,7 @@ public final class RootExecutor {
     }
 
     public static boolean probeRoot(Context context) {
-        ExecResult result = runRaw("id -u", 1800L);
+        ExecResult result = runRaw("id -u", 15000L);
         boolean available = !result.timedOut && result.exitCode == 0
                 && "0".equals(result.output.trim());
         prefs(context).edit().putBoolean(KEY_ROOT_AVAILABLE, available).apply();
