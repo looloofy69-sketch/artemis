@@ -321,6 +321,8 @@ def create_screen_client(
     device_id: str, backend: str | HierarchyBackend | None = None
 ) -> ScreenClient:
     """Build the screen client for ``device_id`` according to the configured backend."""
+    if os.environ.get("ARTEMIS_ON_DEVICE_RUNTIME") == "1":
+        return OnDeviceRuntimeClient(device_id)
     resolved = resolve_backend(backend)
     if resolved is HierarchyBackend.UIAUTOMATOR:
         return UIAutomatorClient(device_id=device_id)
