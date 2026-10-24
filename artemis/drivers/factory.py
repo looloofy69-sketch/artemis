@@ -57,7 +57,20 @@ def create_driver(ctx: "ArtemisContext") -> BaseDeviceDriver:
             height=ctx.device.device_height if ctx.device else 2400,
         )
 
-    # 3. Default Android ADB driver
+    # 3. Optional phone-local Android Runtime. UI reads and actions go directly to
+    # the local HTTP service. No paired ADB device is required for this branch.
+    if os.environ.get("ARTEMIS_ON_DEVICE_RUNTIME") == "1":
+        from artemis.drivers.android.on_device_runtime_driver import OnDeviceRuntimeDriver
+
+        return OnDeviceRuntimeDriver(
+            device_id=ctx.device.device_id,
+            adb_client=ctx.adb_client,
+            ui_adb_client=getattr(ctx, "ui_adb_client", None),
+            width=ctx.device.device_width,
+            height=ctx.device.device_height,
+        )
+
+    # 4. Default Android ADB driver
     if ctx.adb_client is None:
         ctx.adb_client = AdbClient(
             host=settings.ADB_HOST or "localhost", port=settings.ADB_PORT or 5037
