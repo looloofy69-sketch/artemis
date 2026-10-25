@@ -227,6 +227,30 @@ public class CommandServer extends Thread {
                 return;
             }
 
+            // Authenticated capability discovery for the standard, non-root build.
+            if (path.equals("/capabilities")) {
+                JSONObject capabilities = new JSONObject();
+                capabilities.put("success", true);
+                capabilities.put("runtime", "artemis-android-runtime");
+                capabilities.put("runtime_version", "1.3.1");
+                capabilities.put("accessibility_connected", service != null);
+                capabilities.put("screen_hierarchy", service != null);
+                capabilities.put("gestures", service != null);
+                capabilities.put("screen_capture", service != null);
+                capabilities.put("root_available", false);
+                capabilities.put("root_mode_enabled", false);
+                capabilities.put("root_access_note",
+                        "Root-shell execution is not included in this standard build.");
+                sendJson(output, 200, capabilities.toString());
+                return;
+            }
+
+            if (path.equals("/root/exec")) {
+                sendJson(output, 403,
+                        errorJson("Root-shell execution is not included in this standard build.").toString());
+                return;
+            }
+
             // Route endpoints
             if (path.equals("/snapshot")) {
                 HierarchyDumper.DumpOptions options = HierarchyDumper.DumpOptions.forSnapshot().apply(query);
@@ -346,6 +370,38 @@ public class CommandServer extends Thread {
                     long dur = params.optLong("duration", 300L);
                     resp.put("success", GestureController.swipe(service, x1, y1, x2, y2, dur, 3000L));
                     break;
+                case "launch_app": {
+                    String packageName = params.optString("package", "").trim();
+                    if (!packageName.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) {
+                        resp.put("success", false);
+                        resp.put("error", "Invalid package name");
+                        break;
+                    }
+                    android.content.Intent launch =
+                            service.getPackageManager().getLaunchIntentForPackage(packageName);
+                    if (launch == null) {
+                        resp.put("success", false);
+                        resp.put("error", "No launchable activity for package " + packageName);
+                    } else {
+                        launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                | android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                        service.startActivity(launch);
+                        resp.put("success", true);
+                    }
+                    break;
+                }
+                case "stop_app": {
+                    String packageName = params.optString("package", "").trim();
+                    if (!packageName.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) {
+                        resp.put("success", false);
+                        resp.put("error", "Invalid package name");
+                        break;
+                    }
+                    resp.put("success", false);
+                    resp.put("error",
+                            "Force-stopping apps is not available in the standard runtime build.");
+                    break;
+                }
                 case "type":
                     String text = params.optString("text", "");
                     boolean append = params.optBoolean("append", false);
@@ -422,6 +478,9 @@ public class CommandServer extends Thread {
         switch (status) {
             case 200: return "OK";
             case 400: return "Bad Request";
+            case 403: return "Forbidden";
+            case 405: return "Method Not Allowed";
+            case 504: return "Gateway Timeout";
             case 401: return "Unauthorized";
             case 404: return "Not Found";
             case 413: return "Payload Too Large";

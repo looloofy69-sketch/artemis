@@ -16,6 +16,15 @@
         android:label="@string/app_name"
         android:supportsRtl="true">
 
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".ArtemisAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
@@ -29,7 +38,7 @@
                 android:resource="@xml/accessibility_service_config" />
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Artemis mobile automation test bridge" />
+                android:value="ARTEMIS Runtime accessibility-based UI control" />
         </service>
 
         <!-- Session token drop: only a sender holding WRITE_SECURE_SETTINGS (the adb

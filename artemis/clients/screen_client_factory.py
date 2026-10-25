@@ -42,6 +42,7 @@ from typing import Any
 from PIL import Image
 
 from artemis.clients.accessibility_client import AccessibilityClient, HelperUnavailable
+from artemis.clients.on_device_runtime_client import OnDeviceRuntimeClient
 from artemis.config.constants import ENV_ARTEMIS_HIERARCHY_BACKEND
 from artemis.runtime.adb_endpoint import adb_command
 from artemis.runtime.helper_manager import ProvisionEvent
@@ -320,6 +321,8 @@ def create_screen_client(
     device_id: str, backend: str | HierarchyBackend | None = None
 ) -> ScreenClient:
     """Build the screen client for ``device_id`` according to the configured backend."""
+    if os.environ.get("ARTEMIS_ON_DEVICE_RUNTIME") == "1":
+        return OnDeviceRuntimeClient(device_id)
     resolved = resolve_backend(backend)
     if resolved is HierarchyBackend.UIAUTOMATOR:
         return UIAutomatorClient(device_id=device_id)
