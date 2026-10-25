@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class RootExecutor {
     private static final String PREFS = "artemis_runtime";
     private static final String KEY_ROOT_AVAILABLE = "root_available";
+    private static final String KEY_ROOT_PROBE_PERFORMED = "root_probe_performed";
     private static final String KEY_ROOT_MODE = "root_mode_enabled";
     private static final int MAX_OUTPUT_BYTES = 32 * 1024;
     private static final int MAX_COMMAND_CHARS = 4096;
@@ -36,6 +37,10 @@ public final class RootExecutor {
         return prefs(context).getBoolean(KEY_ROOT_AVAILABLE, false);
     }
 
+    public static boolean wasRootProbePerformed(Context context) {
+        return prefs(context).getBoolean(KEY_ROOT_PROBE_PERFORMED, false);
+    }
+
     public static boolean isRootModeEnabled(Context context) {
         return prefs(context).getBoolean(KEY_ROOT_MODE, false);
     }
@@ -48,7 +53,10 @@ public final class RootExecutor {
         ExecResult result = runRaw("id -u", 15000L);
         boolean available = !result.timedOut && result.exitCode == 0
                 && "0".equals(result.output.trim());
-        prefs(context).edit().putBoolean(KEY_ROOT_AVAILABLE, available).apply();
+        prefs(context).edit()
+                .putBoolean(KEY_ROOT_AVAILABLE, available)
+                .putBoolean(KEY_ROOT_PROBE_PERFORMED, true)
+                .apply();
         return available;
     }
 
@@ -63,6 +71,7 @@ public final class RootExecutor {
         json.put("gestures", accessibilityConnected);
         json.put("screen_capture", accessibilityConnected);
         json.put("root_available", wasRootAvailable(context));
+        json.put("root_probe_performed", wasRootProbePerformed(context));
         json.put("root_mode_enabled", isRootModeEnabled(context));
         json.put("root_access_note",
                 "Root requires a rooted device and explicit approval. Stock Android is not bypassed.");
