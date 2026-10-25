@@ -69,6 +69,28 @@ class OnDeviceRuntimeActuator(AdbActuator):
                 targets=targets,
             ),
             ExtensionTool(
+                name="click_element",
+                description=(
+                    "Click one visible accessible UI node by its exact text label or a fully-qualified Android "
+                    "view ID such as com.example:id/submit. Use view IDs for stable selectors and text for readable "
+                    "labels; provide exactly one selector. This avoids fragile guessed screen coordinates."
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string", "description": "Accessible label text to match."},
+                        "view_id": {"type": "string", "description": "Fully-qualified Android view ID."},
+                        "exact": {
+                            "type": "boolean",
+                            "description": "Require exact text equality; ignored for view_id.",
+                        },
+                    },
+                    "additionalProperties": False,
+                },
+                handler=self._tool_click_element,
+                targets=targets,
+            ),
+            ExtensionTool(
                 name="open_settings",
                 description=(
                     "Open an allowlisted Android Settings page for a user-visible, user-confirmed change. "
@@ -115,6 +137,33 @@ class OnDeviceRuntimeActuator(AdbActuator):
     async def _tool_list_apps(self, query: str = "") -> str:
         data = await self._runtime_driver().list_apps(query)
         return json.dumps(data, ensure_ascii=False)
+
+    async def _tool_click_element(
+        self,
+        text: str | None = None,
+        view_id: str | None = None,
+        exact: bool = True,
+    ) -> str:
+        text_selector = text.strip() if text else ""
+        id_selector = view_id.strip() if view_id else ""
+        if bool(text_selector) == bool(id_selector):
+            return json.dumps(
+                {"success": False, "error": "Provide exactly one of text or view_id."},
+                ensure_ascii=False,
+            )
+        success = await self._runtime_driver().click_element(
+            text=text_selector or None, view_id=id_selector or None, exact=exact
+        )
+        return json.dumps(
+            {
+                "success": success,
+                "selector_type": "text" if text_selector else "view_id",
+                "selector": text_selector or id_selector,
+                "exact": bool(exact),
+                "error": None if success else "No visible, enabled, accessible matching node could be clicked.",
+            },
+            ensure_ascii=False,
+        )
 
     async def _tool_open_settings(self, target: str) -> str:
         success = await self._runtime_driver().open_settings(target)
