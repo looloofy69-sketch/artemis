@@ -9,6 +9,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Build;
 import android.provider.Settings;
 import android.view.View;
 import android.view.accessibility.AccessibilityManager;
@@ -98,11 +99,16 @@ public class MainActivity extends Activity {
     private void refreshStatus() {
         boolean enabled = isAccessibilityEnabled();
         boolean connected = ArtemisAccessibilityService.getInstance() != null;
+        boolean screenshotApiSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R;
         status.setText("Accessibility service: " + (enabled ? "enabled" : "not enabled")
                 + "\nRuntime server: " + (connected ? "running" : "not connected")
                 + "\nLocal API: 127.0.0.1:" + ArtemisAccessibilityService.DEFAULT_PORT
-                + "\nScreen hierarchy, gestures and screenshot: "
-                + (connected ? "available while service is connected" : "waiting for service"));
+                + "\nScreen hierarchy and gestures: "
+                + (connected ? "available while service is connected" : "waiting for service")
+                + "\nScreenshot API (Android 11+): "
+                + (connected && screenshotApiSupported
+                        ? "supported; individual captures may still be denied"
+                        : (screenshotApiSupported ? "waiting for service" : "not supported on this Android version")));
         tokenText.setText(TokenStore.initialize(this));
         updateRootStatus();
     }

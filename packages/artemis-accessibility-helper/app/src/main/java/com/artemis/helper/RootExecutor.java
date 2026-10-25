@@ -2,6 +2,7 @@ package com.artemis.helper;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 
 import org.json.JSONObject;
 
@@ -69,7 +70,9 @@ public final class RootExecutor {
         json.put("accessibility_connected", accessibilityConnected);
         json.put("screen_hierarchy", accessibilityConnected);
         json.put("gestures", accessibilityConnected);
-        json.put("screen_capture", accessibilityConnected);
+        boolean screenshotApiSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R;
+        json.put("screen_capture", accessibilityConnected && screenshotApiSupported);
+        json.put("screen_capture_api_supported", screenshotApiSupported);
         json.put("root_available", wasRootAvailable(context));
         json.put("root_probe_performed", wasRootProbePerformed(context));
         json.put("root_mode_enabled", isRootModeEnabled(context));
