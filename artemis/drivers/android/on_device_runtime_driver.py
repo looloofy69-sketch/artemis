@@ -185,6 +185,14 @@ class OnDeviceRuntimeDriver(AndroidAdbDriver):
         """List launchable applications visible to the runtime's package queries."""
         return await asyncio.to_thread(self.runtime_client.list_apps, query)
 
+    async def click_element(
+        self, *, text: str | None = None, view_id: str | None = None, exact: bool = True
+    ) -> bool:
+        """Click a visible accessibility node by text or Android view ID."""
+        return await asyncio.to_thread(
+            self.runtime_client.click_element, text=text, view_id=view_id, exact=exact
+        )
+
     async def open_settings(self, target: str) -> bool:
         """Open one of the runtime's allowlisted Android Settings pages."""
         return await asyncio.to_thread(self.runtime_client.open_settings, target)
