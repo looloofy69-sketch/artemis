@@ -227,27 +227,35 @@ public class CommandServer extends Thread {
                 return;
             }
 
-            // Authenticated capability discovery for the standard, non-root build.
+            // Authenticated capability discovery: Root Mode is explicit opt-in and bounded by RootExecutor.
             if (path.equals("/capabilities")) {
-                JSONObject capabilities = new JSONObject();
-                capabilities.put("success", true);
-                capabilities.put("runtime", "artemis-android-runtime");
-                capabilities.put("runtime_version", "1.3.1");
-                capabilities.put("accessibility_connected", service != null);
-                capabilities.put("screen_hierarchy", service != null);
-                capabilities.put("gestures", service != null);
-                capabilities.put("screen_capture", service != null);
-                capabilities.put("root_available", false);
-                capabilities.put("root_mode_enabled", false);
-                capabilities.put("root_access_note",
-                        "Root-shell execution is not included in this standard build.");
-                sendJson(output, 200, capabilities.toString());
+                sendJson(output, 200,
+                        RootExecutor.capabilities(service, service != null).toString());
                 return;
             }
 
+            // This route is guarded by local-token auth above, POST-only, Root Mode opt-in,
+            // verified su access, a bounded timeout, and capped output.
             if (path.equals("/root/exec")) {
-                sendJson(output, 403,
-                        errorJson("Root-shell execution is not included in this standard build.").toString());
+                if (!"POST".equals(method)) {
+                    sendJson(output, 405, errorJson("POST required").toString());
+                    return;
+                }
+                JSONObject request = body.isEmpty() ? new JSONObject() : new JSONObject(body);
+                String command = request.optString("command", "");
+                long timeoutMs = request.optLong("timeout_ms", 5000L);
+                RootExecutor.ExecResult result =
+                        RootExecutor.executeAuthorized(service, command, timeoutMs);
+                JSONObject response = new JSONObject();
+                response.put("success", !result.timedOut && result.exitCode == 0);
+                response.put("exit_code", result.exitCode);
+                response.put("timed_out", result.timedOut);
+                response.put("output", result.output);
+                if (result.error != null && !result.error.isEmpty()) {
+                    response.put("error", result.error);
+                }
+                int status = result.timedOut ? 504 : (result.exitCode == 0 ? 200 : 403);
+                sendJson(output, status, response.toString());
                 return;
             }
 
