@@ -144,7 +144,7 @@ The repository now contains a native Android runtime app under `packages/artemis
 ### Get and install the APK
 
 1. Open the repository's Pull Requests page and select the open **ARTEMIS launch-readiness** PR. Open its **Actions** run for `Android Runtime APK` after GitHub Actions finishes.
-2. Download the artifact named `artemis-runtime-debug-apk` and extract `app-debug.apk` on the phone. If the workflow is unavailable or no run exists, Actions may be disabled for the fork; enable Actions in repository Settings and trigger the branch workflow.
+2. Download the artifact named `artemis-runtime-root-dev-debug-apk` and extract `app-debug.apk` on the phone. If the workflow is unavailable or no run exists, Actions may be disabled for the fork; enable Actions in repository Settings and trigger the branch workflow.
 3. Install the APK. Android may ask you to allow installation from the browser/file manager used to download it.
 4. Open **ARTEMIS Runtime** → **Open Accessibility settings** → enable the ARTEMIS Runtime service. Return to the app and tap **Refresh runtime status**. It should report the service as running and display the local API endpoint.
 5. Tap **Copy token**. The token is a credential: do not post it in a public issue, commit it to Git, or include it in screenshots. If you rotate the token, update the environment variable used by the controller.
