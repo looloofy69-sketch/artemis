@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from urllib.parse import urlsplit
 from typing import Any
 
@@ -16,6 +17,8 @@ from artemis.drivers.factory import get_driver
 from artemis.mcp.action_manifest import DEVICE_ACTIONS, ExtensionTool
 from artemis.mcp.action_types import ActionCode, ActionResult
 from artemis.mcp.actuators.adb import AdbActuator
+
+logger = logging.getLogger(__name__)
 
 
 class OnDeviceRuntimeActuator(AdbActuator):
@@ -199,8 +202,8 @@ class OnDeviceRuntimeActuator(AdbActuator):
             width, height = self._runtime_driver().screen_size
             if width > 0 and height > 0:
                 return int(width), int(height)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Could not read native display dimensions; using fallback: %s", exc)
         return super()._dims()
 
     @staticmethod
