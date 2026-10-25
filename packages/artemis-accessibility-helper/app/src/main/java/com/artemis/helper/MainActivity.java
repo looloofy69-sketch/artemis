@@ -24,12 +24,14 @@ import java.util.List;
  * On-device control panel for ARTEMIS Runtime.
  *
  * Stock Android receives only capabilities granted through Android's own
- * accessibility settings. Privileged/root shell execution is excluded from the standard build.
+ * accessibility settings. Root Mode is a separate, off-by-default capability
  * and is available only where a root manager already grants su access.
  */
 public class MainActivity extends Activity {
     private TextView status;
     private TextView tokenText;
+    private TextView rootStatus;
+    private Button rootModeButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,11 +75,16 @@ public class MainActivity extends Activity {
         root.addView(button("Rotate token (revoke old controller token)", v -> confirmRotateToken()));
 
         root.addView(gap(10));
-        root.addView(text("Standard runtime security boundary", 18f, true));
+        root.addView(text("Optional privileged mode", 18f, true));
         root.addView(text(
-                "This build does not contain root-shell execution. It uses Android's user-granted "
-                + "AccessibilityService capabilities only. Device-wide or privileged operations "
-                + "remain controlled by Android and are not enabled by this app.", 14f, false));
+                "Root Mode works only on a device that already has root access. "
+                + "It is disabled by default. Enabling it lets the authenticated local controller "
+                + "run shell commands as root, which can damage the system or erase data.", 14f, false));
+        rootStatus = text("", 14f, true);
+        root.addView(rootStatus);
+        root.addView(button("Test root access", v -> testRootAccess()));
+        rootModeButton = button("Enable root mode", v -> toggleRootMode());
+        root.addView(rootModeButton);
 
         root.addView(gap(12));
         root.addView(text(
@@ -97,6 +104,17 @@ public class MainActivity extends Activity {
                 + "\nScreen hierarchy, gestures and screenshot: "
                 + (connected ? "available while service is connected" : "waiting for service"));
         tokenText.setText(TokenStore.initialize(this));
+        updateRootStatus();
+    }
+
+    private void updateRootStatus() {
+        boolean available = RootExecutor.wasRootAvailable(this);
+        boolean enabled = RootExecutor.isRootModeEnabled(this);
+        rootStatus.setText("Root detected: " + (available ? "yes" : "not verified / unavailable")
+                + "\nRoot Mode: " + (enabled ? "ENABLED" : "disabled"));
+        if (rootModeButton != null) {
+            rootModeButton.setText(enabled ? "Disable root mode" : "Enable root mode");
+        }
     }
 
     private boolean isAccessibilityEnabled() {
@@ -134,6 +152,49 @@ public class MainActivity extends Activity {
                     String token = TokenStore.rotate(this);
                     tokenText.setText(token);
                     Toast.makeText(this, "Token rotated.", Toast.LENGTH_SHORT).show();
+                })
+                .show();
+    }
+
+    private void testRootAccess() {
+        rootStatus.setText("Testing su authorization… approve the request in your root manager if prompted.");
+        new Thread(() -> {
+            boolean available = RootExecutor.probeRoot(this);
+            runOnUiThread(() -> {
+                updateRootStatus();
+                Toast.makeText(this, available ? "Root access verified." : "Root unavailable; standard mode remains usable.",
+                        Toast.LENGTH_LONG).show();
+            });
+        }, "ArtemisRootProbe").start();
+    }
+
+    private void toggleRootMode() {
+        if (RootExecutor.isRootModeEnabled(this)) {
+            RootExecutor.setRootModeEnabled(this, false);
+            updateRootStatus();
+            Toast.makeText(this, "Root Mode disabled.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!RootExecutor.wasRootAvailable(this)) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Root has not been verified")
+                    .setMessage("Test root access first. ARTEMIS cannot grant itself root on stock Android.")
+                    .setPositiveButton("Test root", (dialog, which) -> testRootAccess())
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Enable full root command access?")
+                .setMessage("This allows a controller holding the local pairing token to execute shell "
+                        + "commands as root on this phone. Commands can change settings, modify files, "
+                        + "stop apps or make the device unusable. Enable only on a device you own and "
+                        + "only while you intentionally control it.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Enable root mode", (dialog, which) -> {
+                    RootExecutor.setRootModeEnabled(this, true);
+                    updateRootStatus();
+                    Toast.makeText(this, "Root Mode enabled.", Toast.LENGTH_LONG).show();
                 })
                 .show();
     }
