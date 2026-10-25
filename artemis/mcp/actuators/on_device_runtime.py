@@ -57,7 +57,12 @@ class OnDeviceRuntimeActuator(AdbActuator):
                 ),
                 input_schema={
                     "type": "object",
-                    "properties": {"query": {"type": "string", "description": "Optional app label/package filter."}},
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Optional app label/package filter.",
+                        }
+                    },
                     "additionalProperties": False,
                 },
                 handler=self._tool_list_apps,
@@ -76,9 +81,17 @@ class OnDeviceRuntimeActuator(AdbActuator):
                         "target": {
                             "type": "string",
                             "enum": [
-                                "accessibility", "applications", "display", "wifi", "wireless",
-                                "bluetooth", "developer_options", "location", "notifications",
-                                "sound", "date_time"
+                                "accessibility",
+                                "applications",
+                                "display",
+                                "wifi",
+                                "wireless",
+                                "bluetooth",
+                                "developer_options",
+                                "location",
+                                "notifications",
+                                "sound",
+                                "date_time",
                             ],
                         }
                     },
@@ -106,9 +119,13 @@ class OnDeviceRuntimeActuator(AdbActuator):
     async def _tool_open_settings(self, target: str) -> str:
         success = await self._runtime_driver().open_settings(target)
         return json.dumps(
-            {"success": success, "target": target,
-             "message": "Opened Android Settings." if success
-             else "Android Settings target was unsupported or could not be opened."},
+            {
+                "success": success,
+                "target": target,
+                "message": "Opened Android Settings."
+                if success
+                else "Android Settings target was unsupported or could not be opened.",
+            },
             ensure_ascii=False,
         )
 
@@ -160,34 +177,35 @@ class OnDeviceRuntimeActuator(AdbActuator):
             "click_sequence", f"Tapped in sequence at {'; '.join(outcomes)} (normalized)."
         )
 
-    async def click(
-        self, nx: int, ny: int, times: int = 1, delay_ms: int = 100
-    ) -> ActionResult:
+    async def click(self, nx: int, ny: int, times: int = 1, delay_ms: int = 100) -> ActionResult:
         if not self._valid_normalized_point(nx, ny):
             return ActionResult.failure(
-                "click", "Target must be normalized [x, y] values from 0 to 1000.",
+                "click",
+                "Target must be normalized [x, y] values from 0 to 1000.",
                 code=ActionCode.INVALID_ARGS,
             )
         x, y = self._to_px(nx, ny)
         success = await self._runtime_driver().tap(
-            x, y, times=max(1, min(int(times), 10)),
-            delay_ms=max(0, min(int(delay_ms), 2000))
+            x, y, times=max(1, min(int(times), 10)), delay_ms=max(0, min(int(delay_ms), 2000))
         )
         if not success:
             return ActionResult.failure(
-                "click", f"Native runtime rejected tap at [{nx}, {ny}].",
+                "click",
+                f"Native runtime rejected tap at [{nx}, {ny}].",
                 code=ActionCode.DEVICE_ERROR,
                 normalized_coordinates=[int(nx), int(ny)],
             )
         return ActionResult.success(
-            "click", f"Tapped at [{nx}, {ny}] (normalized).",
+            "click",
+            f"Tapped at [{nx}, {ny}] (normalized).",
             normalized_coordinates=[int(nx), int(ny)],
         )
 
     async def long_press(self, nx: int, ny: int, duration_ms: int = 1000) -> ActionResult:
         if not self._valid_normalized_point(nx, ny):
             return ActionResult.failure(
-                "long_press", "Target must be normalized [x, y] values from 0 to 1000.",
+                "long_press",
+                "Target must be normalized [x, y] values from 0 to 1000.",
                 code=ActionCode.INVALID_ARGS,
             )
         x, y = self._to_px(nx, ny)
@@ -195,13 +213,16 @@ class OnDeviceRuntimeActuator(AdbActuator):
         success = await self._runtime_driver().long_press(x, y, duration)
         if not success:
             return ActionResult.failure(
-                "long_press", f"Native runtime rejected long press at [{nx}, {ny}].",
+                "long_press",
+                f"Native runtime rejected long press at [{nx}, {ny}].",
                 code=ActionCode.DEVICE_ERROR,
                 normalized_coordinates=[int(nx), int(ny)],
             )
         return ActionResult.success(
-            "long_press", f"Long-pressed at [{nx}, {ny}] for {duration}ms (normalized).",
-            normalized_coordinates=[int(nx), int(ny)], duration_ms=duration,
+            "long_press",
+            f"Long-pressed at [{nx}, {ny}] for {duration}ms (normalized).",
+            normalized_coordinates=[int(nx), int(ny)],
+            duration_ms=duration,
         )
 
     async def input_text(
@@ -216,24 +237,29 @@ class OnDeviceRuntimeActuator(AdbActuator):
             nx, ny = int(target[0]), int(target[1])
             if not self._valid_normalized_point(nx, ny):
                 return ActionResult.failure(
-                    "input_text", "Input target must be normalized [x, y] values from 0 to 1000.",
+                    "input_text",
+                    "Input target must be normalized [x, y] values from 0 to 1000.",
                     code=ActionCode.INVALID_ARGS,
                 )
             x, y = self._to_px(nx, ny)
             coords = [nx, ny]
             if not await driver.tap(x, y):
                 return ActionResult.failure(
-                    "input_text", f"Could not focus input target at {coords}.",
-                    code=ActionCode.DEVICE_ERROR, normalized_coordinates=coords,
+                    "input_text",
+                    f"Could not focus input target at {coords}.",
+                    code=ActionCode.DEVICE_ERROR,
+                    normalized_coordinates=coords,
                 )
         if not await driver.input_text(text, clear_existing=bool(clear_exist)):
             return ActionResult.failure(
                 "input_text",
                 "Native runtime could not set the focused text field. The field may be unsupported or password-protected.",
-                code=ActionCode.DEVICE_ERROR, normalized_coordinates=coords,
+                code=ActionCode.DEVICE_ERROR,
+                normalized_coordinates=coords,
             )
         return ActionResult.success(
-            "input_text", "Text entered using the native AccessibilityService.",
+            "input_text",
+            "Text entered using the native AccessibilityService.",
             normalized_coordinates=coords,
         )
 
@@ -244,7 +270,8 @@ class OnDeviceRuntimeActuator(AdbActuator):
         nx2, ny2 = int(end[0]), int(end[1])
         if not all(self._valid_normalized_point(x, y) for x, y in ((nx1, ny1), (nx2, ny2))):
             return ActionResult.failure(
-                "swipe", "Swipe endpoints must be normalized [x, y] values from 0 to 1000.",
+                "swipe",
+                "Swipe endpoints must be normalized [x, y] values from 0 to 1000.",
                 code=ActionCode.INVALID_ARGS,
             )
         px1, py1 = self._to_px(nx1, ny1)
@@ -256,8 +283,10 @@ class OnDeviceRuntimeActuator(AdbActuator):
                 "swipe", "Native runtime rejected the swipe.", code=ActionCode.DEVICE_ERROR
             )
         return ActionResult.success(
-            "swipe", f"Swiped from [{nx1}, {ny1}] to [{nx2}, {ny2}] (normalized).",
-            normalized_coordinates=[nx1, ny1, nx2, ny2], duration_ms=duration,
+            "swipe",
+            f"Swiped from [{nx1}, {ny1}] to [{nx2}, {ny2}] (normalized).",
+            normalized_coordinates=[nx1, ny1, nx2, ny2],
+            duration_ms=duration,
         )
 
     async def press_key(self, key: str) -> ActionResult:
@@ -272,7 +301,9 @@ class OnDeviceRuntimeActuator(AdbActuator):
                 f"Key '{value}' is not supported by the phone-local runtime or Android declined it.",
                 code=ActionCode.DEVICE_ERROR,
             )
-        return ActionResult.success("press_key", f"Executed supported key/global action '{value}'.")
+        return ActionResult.success(
+            "press_key", f"Executed supported key/global action '{value}'."
+        )
 
     async def manage_app(self, action: str, app_name: str) -> ActionResult:
         operation = str(action).strip().lower()
@@ -285,7 +316,8 @@ class OnDeviceRuntimeActuator(AdbActuator):
             )
         if operation != "launch" or not requested:
             return ActionResult.failure(
-                "manage_app", "Use action='launch' and provide an app label or package.",
+                "manage_app",
+                "Use action='launch' and provide an app label or package.",
                 code=ActionCode.INVALID_ARGS,
             )
         driver = self._runtime_driver()
@@ -294,14 +326,16 @@ class OnDeviceRuntimeActuator(AdbActuator):
             apps = inventory.get("apps", [])
             needle = requested.casefold()
             exact = [
-                app for app in apps
+                app
+                for app in apps
                 if str(app.get("package", "")).casefold() == needle
                 or str(app.get("label", "")).casefold() == needle
             ]
             candidates = exact or list(apps)
             if not candidates:
                 return ActionResult.failure(
-                    "manage_app", f"No launchable app matched '{requested}'.",
+                    "manage_app",
+                    f"No launchable app matched '{requested}'.",
                     code=ActionCode.PACKAGE_NOT_FOUND,
                 )
             if len(candidates) > 1:
@@ -316,7 +350,8 @@ class OnDeviceRuntimeActuator(AdbActuator):
             package = str(candidates[0]["package"])
             if not await driver.launch_app(package):
                 return ActionResult.failure(
-                    "manage_app", f"Android did not launch '{candidates[0].get('label', package)}'.",
+                    "manage_app",
+                    f"Android did not launch '{candidates[0].get('label', package)}'.",
                     code=ActionCode.DEVICE_ERROR,
                 )
             return ActionResult.success(
@@ -325,21 +360,25 @@ class OnDeviceRuntimeActuator(AdbActuator):
             )
         except Exception as exc:
             return ActionResult.failure(
-                "manage_app", f"Native app discovery/launch failed: {exc}",
-                code=ActionCode.DEVICE_ERROR, detail=repr(exc),
+                "manage_app",
+                f"Native app discovery/launch failed: {exc}",
+                code=ActionCode.DEVICE_ERROR,
+                detail=repr(exc),
             )
 
     async def open_link(self, url: str) -> ActionResult:
         parsed = urlsplit(str(url).strip())
         if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
             return ActionResult.failure(
-                "open_link", "Only absolute HTTP(S) URLs can be opened.",
+                "open_link",
+                "Only absolute HTTP(S) URLs can be opened.",
                 code=ActionCode.INVALID_ARGS,
             )
         success = await self._runtime_driver().open_link(url)
         if not success:
             return ActionResult.failure(
-                "open_link", "Android could not open this HTTP(S) URL.",
+                "open_link",
+                "Android could not open this HTTP(S) URL.",
                 code=ActionCode.DEVICE_ERROR,
             )
         return ActionResult.success("open_link", f"Asked Android to open '{url}'.")
@@ -351,12 +390,15 @@ class OnDeviceRuntimeActuator(AdbActuator):
                 "Deletion was refused: focus a non-password editable field first.",
                 code=ActionCode.DEVICE_ERROR,
             )
-        return ActionResult.success("erase_one_char", "Deleted one Unicode code point from the focused field.")
+        return ActionResult.success(
+            "erase_one_char", "Deleted one Unicode code point from the focused field."
+        )
 
     async def focus_and_clear_text(self, nx: int, ny: int) -> ActionResult:
         if not self._valid_normalized_point(nx, ny):
             return ActionResult.failure(
-                "focus_and_clear_text", "Target must be normalized [x, y] values from 0 to 1000.",
+                "focus_and_clear_text",
+                "Target must be normalized [x, y] values from 0 to 1000.",
                 code=ActionCode.INVALID_ARGS,
             )
         x, y = self._to_px(nx, ny)
@@ -368,6 +410,7 @@ class OnDeviceRuntimeActuator(AdbActuator):
                 code=ActionCode.DEVICE_ERROR,
             )
         return ActionResult.success(
-            "focus_and_clear_text", f"Cleared text at [{nx}, {ny}] (normalized).",
+            "focus_and_clear_text",
+            f"Cleared text at [{nx}, {ny}] (normalized).",
             normalized_coordinates=[int(nx), int(ny)],
         )

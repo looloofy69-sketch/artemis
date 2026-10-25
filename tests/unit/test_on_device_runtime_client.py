@@ -4,7 +4,10 @@ import json
 
 import pytest
 
-from artemis.clients.on_device_runtime_client import OnDeviceRuntimeClient, OnDeviceRuntimeManager
+from artemis.clients.on_device_runtime_client import (
+    OnDeviceRuntimeClient,
+    OnDeviceRuntimeManager,
+)
 
 
 def test_runtime_manager_requires_local_pairing_token(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -64,8 +67,12 @@ def test_runtime_client_reads_device_diagnostics_and_capabilities(
         if path == "/capabilities":
             body = {"success": True, "supported_actions": ["tap"], "root_available": False}
         else:
-            body = {"success": True, "android_release": "14", "screen_width": 1080,
-                    "screen_height": 2400}
+            body = {
+                "success": True,
+                "android_release": "14",
+                "screen_width": 1080,
+                "screen_height": 2400,
+            }
         return json.dumps(body).encode("utf-8")
 
     monkeypatch.setattr(client, "_http", fake_http)
@@ -85,8 +92,14 @@ def test_runtime_client_filters_and_encodes_app_inventory_query(
 
     def fake_http(path: str, payload=None, timeout=None) -> bytes:
         seen.append(path)
-        return json.dumps({"success": True, "count": 1, "truncated": False,
-                           "apps": [{"label": "Maps", "package": "com.example.maps"}]}).encode()
+        return json.dumps(
+            {
+                "success": True,
+                "count": 1,
+                "truncated": False,
+                "apps": [{"label": "Maps", "package": "com.example.maps"}],
+            }
+        ).encode()
 
     monkeypatch.setattr(client, "_http", fake_http)
     result = client.list_apps("Maps & Directions")
@@ -99,7 +112,9 @@ def test_runtime_client_rejects_invalid_app_inventory(
 ) -> None:
     monkeypatch.setenv("ARTEMIS_RUNTIME_TOKEN", "test-token")
     client = OnDeviceRuntimeClient("artemis-runtime")
-    monkeypatch.setattr(client, "_http", lambda *args, **kwargs: b'{"success":true,"apps":null}')
+    monkeypatch.setattr(
+        client, "_http", lambda *args, **kwargs: b'{"success":true,"apps":null}'
+    )
 
     with pytest.raises(Exception, match="invalid app inventory"):
         client.list_apps()

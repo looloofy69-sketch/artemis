@@ -17,8 +17,13 @@ def test_runtime_actuator_exposes_canonical_actions_and_typed_extensions() -> No
         "list_apps",
         "open_settings",
     }
-    assert all(len(extension.description) >= MIN_EXTENSION_DESCRIPTION_LENGTH for extension in extensions)
-    assert all(extension.targets == frozenset({"operator", "flash", "validator"}) for extension in extensions)
+    assert all(
+        len(extension.description) >= MIN_EXTENSION_DESCRIPTION_LENGTH for extension in extensions
+    )
+    assert all(
+        extension.targets == frozenset({"operator", "flash", "validator"})
+        for extension in extensions
+    )
     assert all(callable(extension.handler) for extension in extensions)
 
 

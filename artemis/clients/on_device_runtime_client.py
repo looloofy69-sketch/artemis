@@ -204,7 +204,6 @@ class OnDeviceRuntimeClient(AccessibilityClient):
             return False
         return self._rpc("press_key", {"key": normalized})
 
-
     def _ensure_session(self) -> HelperSession:
         if self._session is None:
             self.connect()

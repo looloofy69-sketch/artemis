@@ -94,7 +94,9 @@ class McpActionExecutor:
         agent_name: str = "validator",
     ):
         self.ctx = ctx
-        self.actuator = actuator or getattr(ctx, "actuator", None) or create_actuator(ctx, controller)
+        self.actuator = (
+            actuator or getattr(ctx, "actuator", None) or create_actuator(ctx, controller)
+        )
         self.controller = self.actuator.controller
         # Identifies the calling agent / profile to the Explorer tier resolver
         # (``explorer.flash_mode`` vs ``explorer.pro_mode``); the agent itself
@@ -197,7 +199,9 @@ class McpActionExecutor:
                     if not isinstance(extension_payload, dict):
                         try:
                             parsed_payload = json.loads(message)
-                            extension_payload = parsed_payload if isinstance(parsed_payload, dict) else {}
+                            extension_payload = (
+                                parsed_payload if isinstance(parsed_payload, dict) else {}
+                            )
                         except (TypeError, ValueError):
                             extension_payload = {}
                     if extension_payload.get("success") is False:
@@ -217,7 +221,9 @@ class McpActionExecutor:
                 read_only_discovery = extension and raw_name in {
                     "get_runtime_capabilities", "get_device_info", "list_apps"
                 }
-                if (res.ok and not read_only_discovery) or self._observe_despite_failure(raw_name, res):
+                if (res.ok and not read_only_discovery) or self._observe_despite_failure(
+                    raw_name, res
+                ):
                     obs = await session.observe(settle_ms=400)
                     if obs.ok:
                         shot_path = obs.screenshot_path
