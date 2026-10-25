@@ -189,9 +189,10 @@ Supported phone-local tools include the standard click/long-press/swipe/text/glo
 - `get_runtime_capabilities` — read what this runtime build reports it can do.
 - `get_device_info` — Android release/SDK, device model, screen dimensions/rotation, ABIs and foreground activity/package.
 - `list_apps` — discover launchable apps exposed by Android's package-visibility rules; this is not an inventory of hidden/non-launchable packages.
+- `click_element` — click one visible Accessibility node by accessible text or a fully-qualified Android view ID. This avoids guessed coordinates when the app exposes labels/resource IDs.
 - `open_settings` — navigate to an allowlisted Settings page (Accessibility, applications, display, Wi-Fi, Bluetooth, developer options, location, notifications, sound or date/time). The person still confirms changes in Android Settings.
 
-The native API rejects out-of-display touch coordinates and bounds gesture duration. Key actions are deliberately limited: Home/Back/Recents/notifications/quick settings and other declared Accessibility global actions work where Android permits them; Enter invokes the focused field's IME action only on Android 11+; Delete is refused for password or non-focused fields.
+The native API rejects out-of-display tap, double-tap, long-press and swipe coordinates, and bounds gesture duration. Semantic click targeting tries a matching accessible node and then up to six clickable ancestors; it reports failure when no matching accessible action succeeds. Key actions are deliberately limited: Home/Back/Recents/notifications/quick settings and other declared Accessibility global actions work where Android permits them; Enter invokes the focused field's IME action only on Android 11+; Delete is refused for password or non-focused fields.
 
 **Still unavailable without ADB/root or extra Android provisioning:** arbitrary shell commands, force-stop, silently granting permissions, controlling secure/hidden surfaces, and video recording through scrcpy. Android's screenshot API requires Android 11+ and can still be denied. ARTEMIS does not gain root because the Root Mode button exists; this phone's root probe reported unavailable, so root commands should be treated as unavailable. App listing and app launch availability also depend on OEM/package visibility policy.
 
