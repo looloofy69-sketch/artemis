@@ -176,7 +176,6 @@ public class CommandServer extends Thread {
     private void handleHttp(String requestLine, InputStream in, OutputStream output) {
         try {
             String[] parts = requestLine.split(" ");
-            String method = parts.length > 0 ? parts[0].toUpperCase(Locale.ROOT) : "";
             String target = parts.length > 1 ? parts[1] : "/";
             String path = target;
             Map<String, String> query;
