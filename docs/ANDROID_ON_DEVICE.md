@@ -184,7 +184,7 @@ Replace both credential placeholders with real values in your private shell. Do 
 
 The root-enabled development branch now routes ARTEMIS's MCP action layer through a first-party `OnDeviceRuntimeActuator` when `ARTEMIS_ON_DEVICE_RUNTIME=1`. The canonical action schemas remain shared with the usual actuator; the device-control path for this mode uses the phone's local AccessibilityService endpoint rather than an ADB-forwarded helper.
 
-Supported phone-local tools include the standard click/long-press/swipe/text/global-action actions, app launch by visible launcher label or package name, opening HTTP(S) links, clearing text, and deleting one Unicode code point from a focused **non-password** editable field. The phone-local MCP backend additionally advertises:
+Supported phone-local tools include the standard click/long-press/swipe/text/global-action actions, app launch by visible launcher label or package name, opening HTTP(S) links, clearing text, and deleting one Unicode code point from a focused **non-password** editable field. The additional MCP discovery/semantic tools below are exposed to the **Flash and Validator** roles, which invoke the MCP extension handlers directly. The Operator continues to use its existing indexed-element/coordinate action schema; the extension tools are not declared to it until its structured-action translation supports them.
 
 - `get_runtime_capabilities` — read what this runtime build reports it can do.
 - `get_device_info` — Android release/SDK, device model, screen dimensions/rotation, ABIs and foreground activity/package.
