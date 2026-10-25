@@ -197,6 +197,21 @@ class OnDeviceRuntimeClient(AccessibilityClient):
         """Delete one code point from a focused non-password text field."""
         return self._rpc("erase_one_char", {})
 
+    def click_element(
+        self, *, text: str | None = None, view_id: str | None = None, exact: bool = True
+    ) -> bool:
+        """Click exactly one accessible text label or fully-qualified Android view ID."""
+        text_selector = text.strip() if text else ""
+        id_selector = view_id.strip() if view_id else ""
+        if bool(text_selector) == bool(id_selector):
+            return False
+        payload: dict[str, Any] = {"exact": bool(exact)}
+        if text_selector:
+            payload["text"] = text_selector
+        else:
+            payload["view_id"] = id_selector
+        return self._rpc("click_element", payload)
+
     def press_key(self, key: str) -> bool:
         """Dispatch only native key actions explicitly supported by the runtime."""
         normalized = str(key).strip().lower().replace("keycode.", "").replace("keycode_", "")
