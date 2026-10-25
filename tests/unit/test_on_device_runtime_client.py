@@ -118,6 +118,28 @@ def test_runtime_client_rejects_invalid_app_inventory(
         client.list_apps()
 
 
+def test_runtime_client_click_element_requires_one_selector_and_routes_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTEMIS_RUNTIME_TOKEN", "test-token")
+    client = OnDeviceRuntimeClient("artemis-runtime")
+    calls: list[tuple[str, dict]] = []
+
+    def fake_rpc(command: str, params=None) -> bool:
+        calls.append((command, params or {}))
+        return True
+
+    monkeypatch.setattr(client, "_rpc", fake_rpc)
+    assert client.click_element(text="Continue", exact=True) is True
+    assert client.click_element(view_id="com.example:id/continue") is True
+    assert client.click_element(text="Continue", view_id="com.example:id/continue") is False
+    assert client.click_element() is False
+    assert calls == [
+        ("click_element", {"exact": True, "text": "Continue"}),
+        ("click_element", {"exact": True, "view_id": "com.example:id/continue"}),
+    ]
+
+
 def test_runtime_client_dispatches_only_supported_keys_and_settings_actions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

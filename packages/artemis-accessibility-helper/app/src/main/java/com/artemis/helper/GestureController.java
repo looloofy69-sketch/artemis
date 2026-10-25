@@ -287,6 +287,7 @@ public final class GestureController {
             try {
                 if (current.isVisibleToUser() && current.isEnabled() && current.isClickable()
                         && current.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    if (recycleCurrent) HierarchyDumper.safeRecycle(current);
                     return true;
                 }
                 AccessibilityNodeInfo parent = current.getParent();

@@ -15,6 +15,7 @@ def test_runtime_actuator_exposes_canonical_actions_and_typed_extensions() -> No
         "get_runtime_capabilities",
         "get_device_info",
         "list_apps",
+        "click_element",
         "open_settings",
     }
     assert all(
