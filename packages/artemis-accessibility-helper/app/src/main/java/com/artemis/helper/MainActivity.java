@@ -24,7 +24,7 @@ import java.util.List;
  * On-device control panel for ARTEMIS Runtime.
  *
  * Stock Android receives only capabilities granted through Android's own
- * accessibility settings. Root Mode is a separate, off-by-default capability
+ * accessibility settings. Privileged/root shell execution is excluded from the standard build.
  * and is available only where a root manager already grants su access.
  */
 public class MainActivity extends Activity {
