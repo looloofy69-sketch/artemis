@@ -301,9 +301,7 @@ class OnDeviceRuntimeActuator(AdbActuator):
                 f"Key '{value}' is not supported by the phone-local runtime or Android declined it.",
                 code=ActionCode.DEVICE_ERROR,
             )
-        return ActionResult.success(
-            "press_key", f"Executed supported key/global action '{value}'."
-        )
+        return ActionResult.success("press_key", f"Executed supported key/global action '{value}'.")
 
     async def manage_app(self, action: str, app_name: str) -> ActionResult:
         operation = str(action).strip().lower()

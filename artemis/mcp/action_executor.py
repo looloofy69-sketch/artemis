@@ -207,8 +207,11 @@ class McpActionExecutor:
                     if extension_payload.get("success") is False:
                         res = ActionResult.failure(
                             raw_name,
-                            str(extension_payload.get("message") or extension_payload.get("error")
-                                or f"Extension tool '{raw_name}' failed."),
+                            str(
+                                extension_payload.get("message")
+                                or extension_payload.get("error")
+                                or f"Extension tool '{raw_name}' failed."
+                            ),
                             code=ActionCode.DEVICE_ERROR,
                         )
                         message = res.message
@@ -219,7 +222,9 @@ class McpActionExecutor:
                     message = finalize(res) if finalize else res.message
 
                 read_only_discovery = extension and raw_name in {
-                    "get_runtime_capabilities", "get_device_info", "list_apps"
+                    "get_runtime_capabilities",
+                    "get_device_info",
+                    "list_apps",
                 }
                 if (res.ok and not read_only_discovery) or self._observe_despite_failure(
                     raw_name, res

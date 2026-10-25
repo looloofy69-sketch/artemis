@@ -112,9 +112,7 @@ def test_runtime_client_rejects_invalid_app_inventory(
 ) -> None:
     monkeypatch.setenv("ARTEMIS_RUNTIME_TOKEN", "test-token")
     client = OnDeviceRuntimeClient("artemis-runtime")
-    monkeypatch.setattr(
-        client, "_http", lambda *args, **kwargs: b'{"success":true,"apps":null}'
-    )
+    monkeypatch.setattr(client, "_http", lambda *args, **kwargs: b'{"success":true,"apps":null}')
 
     with pytest.raises(Exception, match="invalid app inventory"):
         client.list_apps()
