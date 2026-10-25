@@ -197,6 +197,14 @@ class OnDeviceRuntimeClient(AccessibilityClient):
         """Delete one code point from a focused non-password text field."""
         return self._rpc("erase_one_char", {})
 
+    def press_key(self, key: str) -> bool:
+        """Dispatch only native key actions explicitly supported by the runtime."""
+        normalized = str(key).strip().lower().replace("keycode.", "").replace("keycode_", "")
+        if normalized not in {"enter", "ime_enter", "delete"}:
+            return False
+        return self._rpc("press_key", {"key": normalized})
+
+
     def _ensure_session(self) -> HelperSession:
         if self._session is None:
             self.connect()
