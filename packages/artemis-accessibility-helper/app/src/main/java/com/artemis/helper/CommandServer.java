@@ -613,13 +613,19 @@ public class CommandServer extends Thread {
             case "bluetooth": action = Settings.ACTION_BLUETOOTH_SETTINGS; break;
             case "developer_options": action = Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS; break;
             case "location": action = Settings.ACTION_LOCATION_SOURCE_SETTINGS; break;
-            case "notifications": action = Settings.ACTION_NOTIFICATION_SETTINGS; break;
+            case "notifications":
+                action = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                        ? Settings.ACTION_APP_NOTIFICATION_SETTINGS : Settings.ACTION_SETTINGS;
+                break;
             case "sound": action = Settings.ACTION_SOUND_SETTINGS; break;
             case "date_time": action = Settings.ACTION_DATE_SETTINGS; break;
             default:
                 return errorJson("Unsupported settings target. Use accessibility, applications, display, wifi, wireless, bluetooth, developer_options, location, notifications, sound, or date_time.");
         }
         Intent intent = new Intent(action);
+        if ("notifications".equals(normalized) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            intent.putExtra(Settings.EXTRA_APP_PACKAGE, service.getPackageName());
+        }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         service.startActivity(intent);
         JSONObject result = new JSONObject();
