@@ -31,6 +31,9 @@ import java.util.List;
 public class MainActivity extends Activity {
     private TextView status;
     private TextView tokenText;
+    private Button tokenVisibilityButton;
+    private String currentToken = "";
+    private boolean tokenVisible = false;
     private TextView rootStatus;
     private Button rootModeButton;
 
@@ -72,6 +75,8 @@ public class MainActivity extends Activity {
         tokenText = text("", 13f, false);
         tokenText.setTextIsSelectable(true);
         root.addView(tokenText);
+        tokenVisibilityButton = button("Show token", v -> toggleTokenVisibility());
+        root.addView(tokenVisibilityButton);
         root.addView(button("Copy token", v -> copyToken()));
         root.addView(button("Rotate token (revoke old controller token)", v -> confirmRotateToken()));
 
@@ -109,8 +114,23 @@ public class MainActivity extends Activity {
                 + (connected && screenshotApiSupported
                         ? "supported; individual captures may still be denied"
                         : (screenshotApiSupported ? "waiting for service" : "not supported on this Android version")));
-        tokenText.setText(TokenStore.initialize(this));
+        currentToken = TokenStore.initialize(this);
+        updateTokenDisplay();
         updateRootStatus();
+    }
+
+    private void updateTokenDisplay() {
+        tokenText.setText(tokenVisible
+                ? currentToken
+                : "Token hidden. Tap Show token to reveal it.");
+        if (tokenVisibilityButton != null) {
+            tokenVisibilityButton.setText(tokenVisible ? "Hide token" : "Show token");
+        }
+    }
+
+    private void toggleTokenVisibility() {
+        tokenVisible = !tokenVisible;
+        updateTokenDisplay();
     }
 
     private void updateRootStatus() {
@@ -150,10 +170,12 @@ public class MainActivity extends Activity {
     }
 
     private void copyToken() {
-        String token = TokenStore.initialize(this);
+        currentToken = TokenStore.initialize(this);
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
         if (clipboard != null) {
-            clipboard.setPrimaryClip(ClipData.newPlainText("ARTEMIS Runtime token", token));
+            clipboard.setPrimaryClip(ClipData.newPlainText("ARTEMIS Runtime token", currentToken));
+            tokenVisible = false;
+            updateTokenDisplay();
             Toast.makeText(this, "Runtime token copied. Keep it private.", Toast.LENGTH_LONG).show();
         }
     }
@@ -164,9 +186,10 @@ public class MainActivity extends Activity {
                 .setMessage("Existing controllers using the current token will immediately lose access.")
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Rotate token", (dialog, which) -> {
-                    String token = TokenStore.rotate(this);
-                    tokenText.setText(token);
-                    Toast.makeText(this, "Token rotated.", Toast.LENGTH_SHORT).show();
+                    currentToken = TokenStore.rotate(this);
+                    tokenVisible = false;
+                    updateTokenDisplay();
+                    Toast.makeText(this, "Token rotated. Update the local controller token.", Toast.LENGTH_LONG).show();
                 })
                 .show();
     }
