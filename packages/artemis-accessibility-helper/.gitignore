@@ -2,4 +2,7 @@ build/
 *.idsig
 .gradle/
 *.class
+
+debug.keystore
+
 .DS_Store

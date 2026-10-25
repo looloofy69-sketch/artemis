@@ -13,6 +13,8 @@ import android.os.Looper;
 import android.util.Log;
 import android.view.accessibility.AccessibilityNodeInfo;
 
+import java.util.List;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -203,6 +205,147 @@ public final class GestureController {
      * is the IME-free path the host uses for multiline and non-ASCII input:
      * set the clip here, then KEYCODE_PASTE over adb.
      */
+    /**
+     * Removes the final Unicode code point from the focused, non-password editable field.
+     * Refuses unfocused/password fields rather than reading or rewriting sensitive content.
+     */
+    /**
+     * Triggers the IME's configured editor action (for example Search, Send or Done).
+     * This is supported on Android 11+ and is refused for password or non-editable fields.
+     */
+    /**
+     * Clicks the first accessible node matching text. Exact matching is case-insensitive.
+     * If the text node is not clickable, up to six ancestors are checked for a clickable
+     * container. The caller remains responsible for choosing an unambiguous selector.
+     */
+    public static boolean clickByText(AccessibilityService service, String text, boolean exact) {
+        String selector = text == null ? "" : text.trim();
+        if (service == null || selector.isEmpty() || selector.length() > 256) return false;
+        AccessibilityNodeInfo root = null;
+        List<AccessibilityNodeInfo> matches = null;
+        try {
+            root = service.getRootInActiveWindow();
+            if (root == null) return false;
+            matches = root.findAccessibilityNodeInfosByText(selector);
+            if (matches == null) return false;
+            for (AccessibilityNodeInfo node : matches) {
+                if (node == null || !node.isVisibleToUser() || !node.isEnabled()) continue;
+                if (exact) {
+                    CharSequence label = node.getText();
+                    if (label == null || !selector.equalsIgnoreCase(label.toString().trim())) continue;
+                }
+                if (clickNodeOrClickableAncestor(node)) return true;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "clickByText failed", t);
+        } finally {
+            if (matches != null) {
+                for (AccessibilityNodeInfo node : matches) {
+                    HierarchyDumper.safeRecycle(node);
+                }
+            }
+            HierarchyDumper.safeRecycle(root);
+        }
+        return false;
+    }
+
+    /**
+     * Clicks an accessible node identified by a fully-qualified Android view ID,
+     * for example com.example:id/submit_button.
+     */
+    public static boolean clickByViewId(AccessibilityService service, String viewId) {
+        String selector = viewId == null ? "" : viewId.trim();
+        if (service == null || selector.length() > 256 || !selector.contains(":id/")) return false;
+        AccessibilityNodeInfo root = null;
+        List<AccessibilityNodeInfo> matches = null;
+        try {
+            root = service.getRootInActiveWindow();
+            if (root == null) return false;
+            matches = root.findAccessibilityNodeInfosByViewId(selector);
+            if (matches == null) return false;
+            for (AccessibilityNodeInfo node : matches) {
+                if (node == null || !node.isVisibleToUser() || !node.isEnabled()) continue;
+                if (clickNodeOrClickableAncestor(node)) return true;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "clickByViewId failed", t);
+        } finally {
+            if (matches != null) {
+                for (AccessibilityNodeInfo node : matches) {
+                    HierarchyDumper.safeRecycle(node);
+                }
+            }
+            HierarchyDumper.safeRecycle(root);
+        }
+        return false;
+    }
+
+    private static boolean clickNodeOrClickableAncestor(AccessibilityNodeInfo node) {
+        AccessibilityNodeInfo current = node;
+        boolean recycleCurrent = false;
+        for (int depth = 0; current != null && depth <= 6; depth++) {
+            try {
+                if (current.isVisibleToUser() && current.isEnabled() && current.isClickable()
+                        && current.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    if (recycleCurrent) HierarchyDumper.safeRecycle(current);
+                    return true;
+                }
+                AccessibilityNodeInfo parent = current.getParent();
+                if (recycleCurrent) HierarchyDumper.safeRecycle(current);
+                current = parent;
+                recycleCurrent = true;
+            } catch (Throwable t) {
+                Log.w(TAG, "clickNodeOrClickableAncestor failed", t);
+                break;
+            }
+        }
+        if (recycleCurrent) HierarchyDumper.safeRecycle(current);
+        return false;
+    }
+
+    public static boolean pressImeEnter(AccessibilityService service) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false;
+        AccessibilityNodeInfo inputNode = HierarchyDumper.findInputNode(service);
+        if (inputNode == null) return false;
+        try {
+            if (!inputNode.isFocused() || !inputNode.isEditable()
+                    || inputNode.isPassword() || !inputNode.isEnabled()) {
+                return false;
+            }
+            return inputNode.performAction(
+                    AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.getId());
+        } catch (Throwable t) {
+            Log.w(TAG, "pressImeEnter failed", t);
+            return false;
+        } finally {
+            HierarchyDumper.safeRecycle(inputNode);
+        }
+    }
+
+    public static boolean eraseOneChar(AccessibilityService service) {
+        AccessibilityNodeInfo inputNode = HierarchyDumper.findInputNode(service);
+        if (inputNode == null) return false;
+        try {
+            if (!inputNode.isFocused() || inputNode.isPassword() || !inputNode.isEnabled()) {
+                return false;
+            }
+            CharSequence existing = inputNode.getText();
+            if (existing == null || existing.length() == 0) return true;
+            String value = existing.toString();
+            int end = value.offsetByCodePoints(value.length(), -1);
+            Bundle args = new Bundle();
+            args.putCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                    value.substring(0, end));
+            return inputNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args);
+        } catch (Throwable t) {
+            Log.w(TAG, "eraseOneChar failed", t);
+            return false;
+        } finally {
+            HierarchyDumper.safeRecycle(inputNode);
+        }
+    }
+
     public static boolean setClipboard(final AccessibilityService service, final String text) {
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicBoolean ok = new AtomicBoolean(false);

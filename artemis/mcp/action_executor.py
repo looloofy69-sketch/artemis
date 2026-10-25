@@ -45,6 +45,7 @@ from artemis.mcp.action_specs import exception_prefix
 from artemis.mcp.action_session import ActionSession, get_action_session
 from artemis.mcp.action_types import ActionCode, ActionResult
 from artemis.mcp.actuators.adb import AdbActuator
+from artemis.mcp.actuators.factory import create_actuator
 from artemis.agents.validator.tool_declarations import (
     ToolExecutionResult,
     normalize_coordinate_target,
@@ -93,7 +94,16 @@ class McpActionExecutor:
         agent_name: str = "validator",
     ):
         self.ctx = ctx
-        self.actuator = actuator or getattr(ctx, "actuator", None) or AdbActuator(ctx, controller)
+        self.actuator = (
+            actuator or getattr(ctx, "actuator", None) or create_actuator(ctx, controller)
+        )
+        # Publish the selected backend on the composition root so other components
+        # (e.g. Flash/operator tool declaration filtering) advertise the same extension tools.
+        if getattr(ctx, "actuator", None) is None:
+            try:
+                ctx.actuator = self.actuator
+            except (AttributeError, TypeError, ValueError) as exc:
+                logger.warning(f"Could not publish selected actuator on context: {exc}")
         self.controller = self.actuator.controller
         # Identifies the calling agent / profile to the Explorer tier resolver
         # (``explorer.flash_mode`` vs ``explorer.pro_mode``); the agent itself
@@ -190,12 +200,42 @@ class McpActionExecutor:
                         (b.text for b in raw_result.content if getattr(b, "type", "") == "text"),
                         f"Extension tool '{raw_name}' completed.",
                     )
-                    res = ActionResult.success(raw_name, message)
+                    # Native-runtime discovery extensions return JSON text. Preserve their
+                    # explicit failure state instead of recording every extension call as success.
+                    extension_payload = raw_result.structuredContent
+                    if not isinstance(extension_payload, dict):
+                        try:
+                            parsed_payload = json.loads(message)
+                            extension_payload = (
+                                parsed_payload if isinstance(parsed_payload, dict) else {}
+                            )
+                        except (TypeError, ValueError):
+                            extension_payload = {}
+                    if extension_payload.get("success") is False:
+                        res = ActionResult.failure(
+                            raw_name,
+                            str(
+                                extension_payload.get("message")
+                                or extension_payload.get("error")
+                                or f"Extension tool '{raw_name}' failed."
+                            ),
+                            code=ActionCode.DEVICE_ERROR,
+                        )
+                        message = res.message
+                    else:
+                        res = ActionResult.success(raw_name, message)
                 else:
                     res = await session.call(wire_name, wire_args)
                     message = finalize(res) if finalize else res.message
 
-                if res.ok or self._observe_despite_failure(raw_name, res):
+                read_only_discovery = extension and raw_name in {
+                    "get_runtime_capabilities",
+                    "get_device_info",
+                    "list_apps",
+                }
+                if (res.ok and not read_only_discovery) or self._observe_despite_failure(
+                    raw_name, res
+                ):
                     obs = await session.observe(settle_ms=400)
                     if obs.ok:
                         shot_path = obs.screenshot_path

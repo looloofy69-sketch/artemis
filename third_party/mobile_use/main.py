@@ -84,6 +84,10 @@ def new_default_config_builder() -> AgentConfigBuilder:
     config = Builders.AgentConfig.with_default_profile(profile=agent_profile)
     if settings.ADB_HOST:
         config.with_adb_server(host=settings.ADB_HOST, port=settings.ADB_PORT)
+    if os.environ.get("ARTEMIS_ON_DEVICE_RUNTIME") == "1":
+        # The phone-local AccessibilityService provides still screenshots. scrcpy/ADB
+        # recording is not available in this mode yet, so do not require desktop video tools.
+        config.with_video_recording_tools(enabled=False)
     return config
 
 

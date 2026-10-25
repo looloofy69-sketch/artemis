@@ -1,6 +1,13 @@
 package com.artemis.helper;
 
 import android.util.Log;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
@@ -14,9 +21,14 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -41,6 +53,7 @@ public class CommandServer extends Thread {
     private static final String TAG = "ArtemisCommandServer";
     private static final int MAX_HEADER_LINE = 16 * 1024;
     private static final int MAX_BODY = 4 * 1024 * 1024;
+    private static final int MAX_LAUNCHABLE_APPS = 200;
     private static final String TOKEN_HEADER = "x-artemis-token";
 
     private final ArtemisAccessibilityService service;
@@ -176,6 +189,7 @@ public class CommandServer extends Thread {
     private void handleHttp(String requestLine, InputStream in, OutputStream output) {
         try {
             String[] parts = requestLine.split(" ");
+            String method = parts.length > 0 ? parts[0].toUpperCase(Locale.ROOT) : "";
             String target = parts.length > 1 ? parts[1] : "/";
             String path = target;
             Map<String, String> query;
@@ -224,6 +238,83 @@ public class CommandServer extends Thread {
             }
             if (!authed) {
                 sendJson(output, 401, unauthorizedJson().toString());
+                return;
+            }
+
+            if (path.equals("/device")) {
+                if (!"GET".equals(method)) {
+                    sendJson(output, 405, errorJson("GET required").toString());
+                    return;
+                }
+                sendJson(output, 200, buildDeviceInfo().toString());
+                return;
+            }
+
+            if (path.equals("/apps")) {
+                if (!"GET".equals(method)) {
+                    sendJson(output, 405, errorJson("GET required").toString());
+                    return;
+                }
+                sendJson(output, 200, buildLaunchableApps(query.get("q")).toString());
+                return;
+            }
+
+            // Authenticated capability discovery: Root Mode is explicit opt-in and bounded by RootExecutor.
+            if (path.equals("/capabilities")) {
+                JSONObject capabilities = RootExecutor.capabilities(service, service != null);
+                JSONArray actions = new JSONArray();
+                actions.put("tap");
+                actions.put("double_tap");
+                actions.put("long_press");
+                actions.put("swipe");
+                actions.put("type");
+                actions.put("clear");
+                actions.put("clipboard");
+                actions.put("global");
+                actions.put("press_key");
+                actions.put("click_element");
+                actions.put("launch_app");
+                actions.put("open_settings");
+                actions.put("open_link");
+                actions.put("device_info");
+                actions.put("list_apps");
+                capabilities.put("supported_actions", actions);
+                capabilities.put("supports_device_info", true);
+                capabilities.put("supports_app_inventory", true);
+                capabilities.put("supports_settings_shortcuts", true);
+                capabilities.put("supports_open_link", true);
+                capabilities.put("supports_accessible_element_click", true);
+                capabilities.put("requires_adb_for_core_ui", false);
+                capabilities.put("screenshot_min_sdk", 30);
+                capabilities.put("supports_screenshot_api", Build.VERSION.SDK_INT >= Build.VERSION_CODES.R);
+                capabilities.put("force_stop_supported", false);
+                capabilities.put("root_execution_endpoint_present", true);
+                sendJson(output, 200, capabilities.toString());
+                return;
+            }
+
+            // This route is guarded by local-token auth above, POST-only, Root Mode opt-in,
+            // verified su access, a bounded timeout, and capped output.
+            if (path.equals("/root/exec")) {
+                if (!"POST".equals(method)) {
+                    sendJson(output, 405, errorJson("POST required").toString());
+                    return;
+                }
+                JSONObject request = body.isEmpty() ? new JSONObject() : new JSONObject(body);
+                String command = request.optString("command", "");
+                long timeoutMs = request.optLong("timeout_ms", 5000L);
+                RootExecutor.ExecResult result =
+                        RootExecutor.executeAuthorized(service, command, timeoutMs);
+                JSONObject response = new JSONObject();
+                response.put("success", !result.timedOut && result.exitCode == 0);
+                response.put("exit_code", result.exitCode);
+                response.put("timed_out", result.timedOut);
+                response.put("output", result.output);
+                if (result.error != null && !result.error.isEmpty()) {
+                    response.put("error", result.error);
+                }
+                int status = result.timedOut ? 504 : (result.exitCode == 0 ? 200 : 403);
+                sendJson(output, status, response.toString());
                 return;
             }
 
@@ -294,6 +385,50 @@ public class CommandServer extends Thread {
         JSONObject resp = new JSONObject();
         try {
             switch (cmd.toLowerCase(Locale.ROOT)) {
+                case "device_info":
+                    return buildDeviceInfo();
+                case "list_apps":
+                    return buildLaunchableApps(params.optString("query", ""));
+                case "open_settings":
+                    return openSettings(params.optString("target", ""));
+                case "open_link":
+                    return openLink(params.optString("url", ""));
+                case "click_element": {
+                    String textSelector = params.optString("text", "").trim();
+                    String viewIdSelector = params.optString("view_id", "").trim();
+                    boolean exact = params.optBoolean("exact", true);
+                    if (textSelector.isEmpty() == viewIdSelector.isEmpty()) {
+                        resp.put("success", false);
+                        resp.put("error", "Provide exactly one of text or view_id.");
+                    } else if (!textSelector.isEmpty()) {
+                        resp.put("success", GestureController.clickByText(service, textSelector, exact));
+                    } else {
+                        resp.put("success", GestureController.clickByViewId(service, viewIdSelector));
+                    }
+                    if (!resp.optBoolean("success", false)) {
+                        resp.put("error", "No visible, enabled, accessible matching node could be clicked.");
+                    }
+                    break;
+                }
+                case "press_key": {
+                    String key = params.optString("key", "").trim().toLowerCase(Locale.ROOT);
+                    boolean supported = false;
+                    if ("enter".equals(key) || "ime_enter".equals(key)) {
+                        supported = GestureController.pressImeEnter(service);
+                    } else if ("delete".equals(key)) {
+                        supported = GestureController.eraseOneChar(service);
+                    }
+                    resp.put("success", supported);
+                    if (!supported) {
+                        resp.put("error",
+                                "Unsupported key action or no focused non-password editable field. " +
+                                "Supported text keys: enter (Android 11+), delete.");
+                    }
+                    break;
+                }
+                case "erase_one_char":
+                    resp.put("success", GestureController.eraseOneChar(service));
+                    break;
                 case "ping":
                     return buildPing(true);
                 case "dump":
@@ -308,8 +443,8 @@ public class CommandServer extends Thread {
                 case "tap":
                     float x = (float) params.optDouble("x", -1.0);
                     float y = (float) params.optDouble("y", -1.0);
-                    long tapTimeout = params.optLong("timeout", 1500L);
-                    if (x < 0 || y < 0) {
+                    long tapTimeout = Math.max(250L, Math.min(params.optLong("timeout", 1500L), 5000L));
+                    if (!isScreenPoint(x, y)) {
                         resp.put("success", false);
                         resp.put("error", "Invalid coordinates");
                     } else {
@@ -319,8 +454,8 @@ public class CommandServer extends Thread {
                 case "double_tap":
                     float dtx = (float) params.optDouble("x", -1.0);
                     float dty = (float) params.optDouble("y", -1.0);
-                    long dtTimeout = params.optLong("timeout", 2000L);
-                    if (dtx < 0 || dty < 0) {
+                    long dtTimeout = Math.max(250L, Math.min(params.optLong("timeout", 2000L), 5000L));
+                    if (!isScreenPoint(dtx, dty)) {
                         resp.put("success", false);
                         resp.put("error", "Invalid coordinates");
                     } else {
@@ -330,8 +465,8 @@ public class CommandServer extends Thread {
                 case "long_press":
                     float lpx = (float) params.optDouble("x", -1.0);
                     float lpy = (float) params.optDouble("y", -1.0);
-                    long lpDuration = params.optLong("duration", 1000L);
-                    if (lpx < 0 || lpy < 0) {
+                    long lpDuration = Math.max(500L, Math.min(params.optLong("duration", 1000L), 5000L));
+                    if (!isScreenPoint(lpx, lpy)) {
                         resp.put("success", false);
                         resp.put("error", "Invalid coordinates");
                     } else {
@@ -344,8 +479,46 @@ public class CommandServer extends Thread {
                     float x2 = (float) params.optDouble("x2", -1.0);
                     float y2 = (float) params.optDouble("y2", -1.0);
                     long dur = params.optLong("duration", 300L);
-                    resp.put("success", GestureController.swipe(service, x1, y1, x2, y2, dur, 3000L));
+                    if (!isScreenPoint(x1, y1) || !isScreenPoint(x2, y2)) {
+                        resp.put("success", false);
+                        resp.put("error", "Swipe coordinates must be within the current display.");
+                    } else {
+                        resp.put("success", GestureController.swipe(
+                                service, x1, y1, x2, y2, Math.max(50L, Math.min(dur, 5000L)), 3000L));
+                    }
                     break;
+                case "launch_app": {
+                    String packageName = params.optString("package", "").trim();
+                    if (!packageName.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) {
+                        resp.put("success", false);
+                        resp.put("error", "Invalid package name");
+                        break;
+                    }
+                    android.content.Intent launch =
+                            service.getPackageManager().getLaunchIntentForPackage(packageName);
+                    if (launch == null) {
+                        resp.put("success", false);
+                        resp.put("error", "No launchable activity for package " + packageName);
+                    } else {
+                        launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                | android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                        service.startActivity(launch);
+                        resp.put("success", true);
+                    }
+                    break;
+                }
+                case "stop_app": {
+                    String packageName = params.optString("package", "").trim();
+                    if (!packageName.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) {
+                        resp.put("success", false);
+                        resp.put("error", "Invalid package name");
+                        break;
+                    }
+                    resp.put("success", false);
+                    resp.put("error",
+                            "Force-stopping apps is not available in the standard runtime build.");
+                    break;
+                }
                 case "type":
                     String text = params.optString("text", "");
                     boolean append = params.optBoolean("append", false);
@@ -381,6 +554,134 @@ public class CommandServer extends Thread {
      * to upgrade, and token_set to decide whether to push its token. The
      * foreground package and activity are only disclosed to an authenticated caller.
      */
+    private boolean isScreenPoint(float x, float y) {
+        if (Float.isNaN(x) || Float.isNaN(y) || Float.isInfinite(x) || Float.isInfinite(y)
+                || x < 0 || y < 0 || service == null) return false;
+        DisplayUtils.DisplayInfo display = DisplayUtils.getDisplayInfo(service);
+        return display.width > 0 && display.height > 0 && x < display.width && y < display.height;
+    }
+
+    private JSONObject buildDeviceInfo() throws Exception {
+        JSONObject result = new JSONObject();
+        DisplayUtils.DisplayInfo display = DisplayUtils.getDisplayInfo(service);
+        result.put("success", true);
+        result.put("runtime", "artemis-android-runtime");
+        result.put("runtime_version", service.getVersionName());
+        result.put("package_name", service.getPackageName());
+        result.put("manufacturer", Build.MANUFACTURER);
+        result.put("brand", Build.BRAND);
+        result.put("model", Build.MODEL);
+        result.put("device", Build.DEVICE);
+        result.put("product", Build.PRODUCT);
+        result.put("android_release", Build.VERSION.RELEASE);
+        result.put("sdk_int", Build.VERSION.SDK_INT);
+        result.put("screen_width", display.width);
+        result.put("screen_height", display.height);
+        result.put("rotation", display.rotation);
+        result.put("foreground_package", service.getCurrentPackageName());
+        result.put("foreground_activity", service.getCurrentActivityName());
+        result.put("accessibility_connected", ArtemisAccessibilityService.getInstance() != null);
+        JSONArray abis = new JSONArray();
+        for (String abi : Build.SUPPORTED_ABIS) abis.put(abi);
+        result.put("supported_abis", abis);
+        return result;
+    }
+
+    private JSONObject buildLaunchableApps(String rawQuery) throws Exception {
+        PackageManager packageManager = service.getPackageManager();
+        Intent launcherIntent = new Intent(Intent.ACTION_MAIN);
+        launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+        List<ResolveInfo> launchables =
+                packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY);
+        Collections.sort(launchables, new Comparator<ResolveInfo>() {
+            @Override
+            public int compare(ResolveInfo left, ResolveInfo right) {
+                String leftLabel = String.valueOf(left.loadLabel(packageManager));
+                String rightLabel = String.valueOf(right.loadLabel(packageManager));
+                return leftLabel.compareToIgnoreCase(rightLabel);
+            }
+        });
+        String filter = rawQuery == null ? "" : rawQuery.trim().toLowerCase(Locale.ROOT);
+        JSONArray apps = new JSONArray();
+        Set<String> seenPackages = new HashSet<>();
+        boolean truncated = false;
+        for (ResolveInfo info : launchables) {
+            if (info.activityInfo == null || info.activityInfo.packageName == null) continue;
+            String packageName = info.activityInfo.packageName;
+            String label = String.valueOf(info.loadLabel(packageManager));
+            if (!filter.isEmpty()
+                    && !label.toLowerCase(Locale.ROOT).contains(filter)
+                    && !packageName.toLowerCase(Locale.ROOT).contains(filter)) continue;
+            if (seenPackages.contains(packageName)) continue;
+            if (apps.length() >= MAX_LAUNCHABLE_APPS) { truncated = true; break; }
+            seenPackages.add(packageName);
+            JSONObject app = new JSONObject();
+            app.put("label", label);
+            app.put("package", packageName);
+            app.put("activity", info.activityInfo.name == null ? "" : info.activityInfo.name);
+            app.put("system_app", (info.activityInfo.applicationInfo.flags
+                    & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0);
+            apps.put(app);
+        }
+        JSONObject result = new JSONObject();
+        result.put("success", true);
+        result.put("count", apps.length());
+        result.put("truncated", truncated);
+        result.put("apps", apps);
+        return result;
+    }
+
+    private JSONObject openSettings(String target) throws Exception {
+        String normalized = target == null ? "" : target.trim().toLowerCase(Locale.ROOT);
+        String action;
+        switch (normalized) {
+            case "accessibility": action = Settings.ACTION_ACCESSIBILITY_SETTINGS; break;
+            case "applications": action = Settings.ACTION_APPLICATION_SETTINGS; break;
+            case "display": action = Settings.ACTION_DISPLAY_SETTINGS; break;
+            case "wifi": action = Settings.ACTION_WIFI_SETTINGS; break;
+            case "wireless": action = Settings.ACTION_WIRELESS_SETTINGS; break;
+            case "bluetooth": action = Settings.ACTION_BLUETOOTH_SETTINGS; break;
+            case "developer_options": action = Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS; break;
+            case "location": action = Settings.ACTION_LOCATION_SOURCE_SETTINGS; break;
+            case "notifications":
+                action = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                        ? Settings.ACTION_APP_NOTIFICATION_SETTINGS : Settings.ACTION_SETTINGS;
+                break;
+            case "sound": action = Settings.ACTION_SOUND_SETTINGS; break;
+            case "date_time": action = Settings.ACTION_DATE_SETTINGS; break;
+            default:
+                return errorJson("Unsupported settings target. Use accessibility, applications, display, wifi, wireless, bluetooth, developer_options, location, notifications, sound, or date_time.");
+        }
+        Intent intent = new Intent(action);
+        if ("notifications".equals(normalized) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            intent.putExtra(Settings.EXTRA_APP_PACKAGE, service.getPackageName());
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        service.startActivity(intent);
+        JSONObject result = new JSONObject();
+        result.put("success", true);
+        result.put("target", normalized);
+        result.put("action", action);
+        result.put("note", "Opened Android Settings. The user must confirm any permission or system change.");
+        return result;
+    }
+
+    private JSONObject openLink(String rawUrl) throws Exception {
+        String value = rawUrl == null ? "" : rawUrl.trim();
+        Uri uri = Uri.parse(value);
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        if ((!scheme.equals("http") && !scheme.equals("https")) || uri.getHost() == null) {
+            return errorJson("Only absolute http:// and https:// URLs are supported.");
+        }
+        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        service.startActivity(intent);
+        JSONObject result = new JSONObject();
+        result.put("success", true);
+        result.put("url", uri.toString());
+        return result;
+    }
+
     private JSONObject buildPing(boolean authed) throws Exception {
         JSONObject r = new JSONObject();
         r.put("success", true);
@@ -422,6 +723,9 @@ public class CommandServer extends Thread {
         switch (status) {
             case 200: return "OK";
             case 400: return "Bad Request";
+            case 403: return "Forbidden";
+            case 405: return "Method Not Allowed";
+            case 504: return "Gateway Timeout";
             case 401: return "Unauthorized";
             case 404: return "Not Found";
             case 413: return "Payload Too Large";
