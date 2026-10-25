@@ -191,12 +191,33 @@ class McpActionExecutor:
                         (b.text for b in raw_result.content if getattr(b, "type", "") == "text"),
                         f"Extension tool '{raw_name}' completed.",
                     )
-                    res = ActionResult.success(raw_name, message)
+                    # Native-runtime discovery extensions return JSON text. Preserve their
+                    # explicit failure state instead of recording every extension call as success.
+                    extension_payload = raw_result.structuredContent
+                    if not isinstance(extension_payload, dict):
+                        try:
+                            parsed_payload = json.loads(message)
+                            extension_payload = parsed_payload if isinstance(parsed_payload, dict) else {}
+                        except (TypeError, ValueError):
+                            extension_payload = {}
+                    if extension_payload.get("success") is False:
+                        res = ActionResult.failure(
+                            raw_name,
+                            str(extension_payload.get("message") or extension_payload.get("error")
+                                or f"Extension tool '{raw_name}' failed."),
+                            code=ActionCode.DEVICE_ERROR,
+                        )
+                        message = res.message
+                    else:
+                        res = ActionResult.success(raw_name, message)
                 else:
                     res = await session.call(wire_name, wire_args)
                     message = finalize(res) if finalize else res.message
 
-                if res.ok or self._observe_despite_failure(raw_name, res):
+                read_only_discovery = extension and raw_name in {
+                    "get_runtime_capabilities", "get_device_info", "list_apps"
+                }
+                if (res.ok and not read_only_discovery) or self._observe_despite_failure(raw_name, res):
                     obs = await session.observe(settle_ms=400)
                     if obs.ok:
                         shot_path = obs.screenshot_path
