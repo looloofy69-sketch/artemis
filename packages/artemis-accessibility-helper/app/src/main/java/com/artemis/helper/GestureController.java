@@ -203,6 +203,34 @@ public final class GestureController {
      * is the IME-free path the host uses for multiline and non-ASCII input:
      * set the clip here, then KEYCODE_PASTE over adb.
      */
+    /**
+     * Removes the final Unicode code point from the focused, non-password editable field.
+     * Refuses unfocused/password fields rather than reading or rewriting sensitive content.
+     */
+    public static boolean eraseOneChar(AccessibilityService service) {
+        AccessibilityNodeInfo inputNode = HierarchyDumper.findInputNode(service);
+        if (inputNode == null) return false;
+        try {
+            if (!inputNode.isFocused() || inputNode.isPassword() || !inputNode.isEnabled()) {
+                return false;
+            }
+            CharSequence existing = inputNode.getText();
+            if (existing == null || existing.length() == 0) return true;
+            String value = existing.toString();
+            int end = value.offsetByCodePoints(value.length(), -1);
+            Bundle args = new Bundle();
+            args.putCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                    value.substring(0, end));
+            return inputNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args);
+        } catch (Throwable t) {
+            Log.w(TAG, "eraseOneChar failed", t);
+            return false;
+        } finally {
+            HierarchyDumper.safeRecycle(inputNode);
+        }
+    }
+
     public static boolean setClipboard(final AccessibilityService service, final String text) {
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicBoolean ok = new AtomicBoolean(false);
