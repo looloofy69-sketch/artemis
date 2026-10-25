@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">ARTEMIS Runtime</string>
-    <string name="accessibility_service_description">ARTEMIS Runtime screen inspection and UI-control service. Requires user-enabled accessibility access.</string>
+    <string name="accessibility_service_description">ARTEMIS Runtime screen inspection and UI-control service. Requires user-enabled accessibility access. Does not include root-shell execution.</string>
 </resources>
