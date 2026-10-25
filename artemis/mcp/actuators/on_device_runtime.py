@@ -78,8 +78,14 @@ class OnDeviceRuntimeActuator(AdbActuator):
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "text": {"type": "string", "description": "Accessible label text to match."},
-                        "view_id": {"type": "string", "description": "Fully-qualified Android view ID."},
+                        "text": {
+                            "type": "string",
+                            "description": "Accessible label text to match.",
+                        },
+                        "view_id": {
+                            "type": "string",
+                            "description": "Fully-qualified Android view ID.",
+                        },
                         "exact": {
                             "type": "boolean",
                             "description": "Require exact text equality; ignored for view_id.",
@@ -160,7 +166,9 @@ class OnDeviceRuntimeActuator(AdbActuator):
                 "selector_type": "text" if text_selector else "view_id",
                 "selector": text_selector or id_selector,
                 "exact": bool(exact),
-                "error": None if success else "No visible, enabled, accessible matching node could be clicked.",
+                "error": None
+                if success
+                else "No visible, enabled, accessible matching node could be clicked.",
             },
             ensure_ascii=False,
         )
