@@ -23,7 +23,7 @@ public final class RootExecutor {
     private static final String PREFS = "artemis_runtime";
     private static final String KEY_ROOT_AVAILABLE = "root_available";
     private static final String KEY_ROOT_PROBE_PERFORMED = "root_probe_performed";
-    private static final String KEY_ROOT_MODE = "root_mode_enabled";
+    private static volatile boolean rootModeEnabled = false;
     private static final int MAX_OUTPUT_BYTES = 32 * 1024;
     private static final int MAX_COMMAND_CHARS = 4096;
 
@@ -42,11 +42,11 @@ public final class RootExecutor {
     }
 
     public static boolean isRootModeEnabled(Context context) {
-        return prefs(context).getBoolean(KEY_ROOT_MODE, false);
+        return rootModeEnabled;
     }
 
     public static void setRootModeEnabled(Context context, boolean enabled) {
-        prefs(context).edit().putBoolean(KEY_ROOT_MODE, enabled).apply();
+        rootModeEnabled = enabled;
     }
 
     public static boolean probeRoot(Context context) {
