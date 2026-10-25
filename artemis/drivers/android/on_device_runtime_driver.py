@@ -162,6 +162,26 @@ class OnDeviceRuntimeDriver(AndroidAdbDriver):
         except Exception as exc:
             return f"Error: {exc}"
 
+    async def get_device_info(self) -> dict[str, Any]:
+        """Return native runtime device diagnostics without ADB."""
+        return await asyncio.to_thread(self.runtime_client.get_device_info)
+
+    async def list_apps(self, query: str = "") -> dict[str, Any]:
+        """List launchable applications visible to the runtime's package queries."""
+        return await asyncio.to_thread(self.runtime_client.list_apps, query)
+
+    async def open_settings(self, target: str) -> bool:
+        """Open one of the runtime's allowlisted Android Settings pages."""
+        return await asyncio.to_thread(self.runtime_client.open_settings, target)
+
+    async def open_link(self, url: str) -> bool:
+        """Open an HTTP(S) URL using the phone's normal app resolver."""
+        return await asyncio.to_thread(self.runtime_client.open_link, url)
+
+    async def erase_one_char(self) -> bool:
+        """Delete one character only from a focused, non-password editable field."""
+        return await asyncio.to_thread(self.runtime_client.erase_one_char)
+
     async def start_video_recording(self, output_dir: Path | None = None) -> None:
         raise RuntimeError(
             "Video recording is not implemented for phone-local runtime mode yet. "
