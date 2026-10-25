@@ -124,6 +124,8 @@ class OnDeviceRuntimeDriver(AndroidAdbDriver):
         }
         if name in global_actions:
             return bool(self.runtime_client._rpc("global", {"action": global_actions[name]}))
+        if name == "delete":
+            return await self.erase_one_char()
         # Non-global key events require shell input, which is intentionally not
         # simulated as a privileged operation on stock Android.
         logger.warning(f"Key action '{name}' is not supported in non-root runtime mode.")
