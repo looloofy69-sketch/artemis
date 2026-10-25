@@ -380,6 +380,23 @@ public class CommandServer extends Thread {
                     return openSettings(params.optString("target", ""));
                 case "open_link":
                     return openLink(params.optString("url", ""));
+                case "click_element": {
+                    String textSelector = params.optString("text", "").trim();
+                    String viewIdSelector = params.optString("view_id", "").trim();
+                    boolean exact = params.optBoolean("exact", true);
+                    if (textSelector.isEmpty() == viewIdSelector.isEmpty()) {
+                        resp.put("success", false);
+                        resp.put("error", "Provide exactly one of text or view_id.");
+                    } else if (!textSelector.isEmpty()) {
+                        resp.put("success", GestureController.clickByText(service, textSelector, exact));
+                    } else {
+                        resp.put("success", GestureController.clickByViewId(service, viewIdSelector));
+                    }
+                    if (!resp.optBoolean("success", false)) {
+                        resp.put("error", "No visible, enabled, accessible matching node could be clicked.");
+                    }
+                    break;
+                }
                 case "press_key": {
                     String key = params.optString("key", "").trim().toLowerCase(Locale.ROOT);
                     boolean supported = false;
@@ -425,7 +442,7 @@ public class CommandServer extends Thread {
                     float dtx = (float) params.optDouble("x", -1.0);
                     float dty = (float) params.optDouble("y", -1.0);
                     long dtTimeout = Math.max(250L, Math.min(params.optLong("timeout", 2000L), 5000L));
-                    if (dtx < 0 || dty < 0) {
+                    if (!isScreenPoint(dtx, dty)) {
                         resp.put("success", false);
                         resp.put("error", "Invalid coordinates");
                     } else {
@@ -436,7 +453,7 @@ public class CommandServer extends Thread {
                     float lpx = (float) params.optDouble("x", -1.0);
                     float lpy = (float) params.optDouble("y", -1.0);
                     long lpDuration = Math.max(500L, Math.min(params.optLong("duration", 1000L), 5000L));
-                    if (lpx < 0 || lpy < 0) {
+                    if (!isScreenPoint(lpx, lpy)) {
                         resp.put("success", false);
                         resp.put("error", "Invalid coordinates");
                     } else {
