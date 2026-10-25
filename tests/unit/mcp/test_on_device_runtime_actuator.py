@@ -34,9 +34,7 @@ def test_executor_publishes_native_actuator_for_agent_tool_discovery(monkeypatch
     import artemis.mcp.action_executor as action_executor_module
 
     selected = SimpleNamespace(controller=object(), extensions=lambda: [])
-    monkeypatch.setattr(
-        action_executor_module, "create_actuator", lambda ctx, controller: selected
-    )
+    monkeypatch.setattr(action_executor_module, "create_actuator", lambda ctx, controller: selected)
     ctx = SimpleNamespace(actuator=None)
 
     executor = action_executor_module.McpActionExecutor(ctx, controller=object())
