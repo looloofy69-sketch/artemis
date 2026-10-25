@@ -207,6 +207,29 @@ public final class GestureController {
      * Removes the final Unicode code point from the focused, non-password editable field.
      * Refuses unfocused/password fields rather than reading or rewriting sensitive content.
      */
+    /**
+     * Triggers the IME's configured editor action (for example Search, Send or Done).
+     * This is supported on Android 11+ and is refused for password or non-editable fields.
+     */
+    public static boolean pressImeEnter(AccessibilityService service) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false;
+        AccessibilityNodeInfo inputNode = HierarchyDumper.findInputNode(service);
+        if (inputNode == null) return false;
+        try {
+            if (!inputNode.isFocused() || !inputNode.isEditable()
+                    || inputNode.isPassword() || !inputNode.isEnabled()) {
+                return false;
+            }
+            return inputNode.performAction(
+                    AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.getId());
+        } catch (Throwable t) {
+            Log.w(TAG, "pressImeEnter failed", t);
+            return false;
+        } finally {
+            HierarchyDumper.safeRecycle(inputNode);
+        }
+    }
+
     public static boolean eraseOneChar(AccessibilityService service) {
         AccessibilityNodeInfo inputNode = HierarchyDumper.findInputNode(service);
         if (inputNode == null) return false;
