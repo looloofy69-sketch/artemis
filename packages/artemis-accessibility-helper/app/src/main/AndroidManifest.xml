@@ -38,7 +38,7 @@
                 android:resource="@xml/accessibility_service_config" />
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Artemis mobile automation test bridge" />
+                android:value="ARTEMIS Runtime accessibility-based UI control" />
         </service>
 
         <!-- Session token drop: only a sender holding WRITE_SECURE_SETTINGS (the adb
