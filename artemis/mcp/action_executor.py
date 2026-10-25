@@ -97,6 +97,13 @@ class McpActionExecutor:
         self.actuator = (
             actuator or getattr(ctx, "actuator", None) or create_actuator(ctx, controller)
         )
+        # Publish the selected backend on the composition root so other components
+        # (e.g. Flash/operator tool declaration filtering) advertise the same extension tools.
+        if getattr(ctx, "actuator", None) is None:
+            try:
+                ctx.actuator = self.actuator
+            except (AttributeError, TypeError, ValueError) as exc:
+                logger.warning(f"Could not publish selected actuator on context: {exc}")
         self.controller = self.actuator.controller
         # Identifies the calling agent / profile to the Explorer tier resolver
         # (``explorer.flash_mode`` vs ``explorer.pro_mode``); the agent itself
