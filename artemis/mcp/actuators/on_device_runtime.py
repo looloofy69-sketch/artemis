@@ -8,11 +8,12 @@ native AccessibilityService endpoint on 127.0.0.1, with no ADB forwarding.
 from __future__ import annotations
 
 import asyncio
+import json
 from urllib.parse import urlsplit
 from typing import Any
 
 from artemis.drivers.factory import get_driver
-from artemis.mcp.action_manifest import DEVICE_ACTIONS
+from artemis.mcp.action_manifest import DEVICE_ACTIONS, ExtensionTool
 from artemis.mcp.action_types import ActionCode, ActionResult
 from artemis.mcp.actuators.adb import AdbActuator
 
@@ -22,6 +23,94 @@ class OnDeviceRuntimeActuator(AdbActuator):
 
     def capabilities(self) -> frozenset[str]:
         return DEVICE_ACTIONS
+
+    def extensions(self) -> list[ExtensionTool]:
+        """Additional read-only discovery tools and safe Settings navigation."""
+        targets = frozenset({"operator", "flash", "validator"})
+        return [
+            ExtensionTool(
+                name="get_runtime_capabilities",
+                description=(
+                    "Read the phone-local ARTEMIS runtime capability report before planning device actions. "
+                    "Use it to adapt to unsupported operations; it does not grant permissions or root."
+                ),
+                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+                handler=self._tool_get_runtime_capabilities,
+                targets=targets,
+            ),
+            ExtensionTool(
+                name="get_device_info",
+                description=(
+                    "Read non-secret device diagnostics such as Android version, model, display dimensions, "
+                    "rotation and current foreground activity. Use before coordinate-sensitive actions."
+                ),
+                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+                handler=self._tool_get_device_info,
+                targets=targets,
+            ),
+            ExtensionTool(
+                name="list_apps",
+                description=(
+                    "List launchable apps visible to Android's launcher query, optionally filtered by name or "
+                    "package. Use to resolve a human app name before manage_app; this is not a complete inventory "
+                    "of hidden or non-launchable packages."
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {"query": {"type": "string", "description": "Optional app label/package filter."}},
+                    "additionalProperties": False,
+                },
+                handler=self._tool_list_apps,
+                targets=targets,
+            ),
+            ExtensionTool(
+                name="open_settings",
+                description=(
+                    "Open an allowlisted Android Settings page for a user-visible, user-confirmed change. "
+                    "Allowed targets are accessibility, applications, display, wifi, wireless, bluetooth, "
+                    "developer_options, location, notifications, sound and date_time; it cannot silently grant settings."
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "target": {
+                            "type": "string",
+                            "enum": [
+                                "accessibility", "applications", "display", "wifi", "wireless",
+                                "bluetooth", "developer_options", "location", "notifications",
+                                "sound", "date_time"
+                            ],
+                        }
+                    },
+                    "required": ["target"],
+                    "additionalProperties": False,
+                },
+                handler=self._tool_open_settings,
+                targets=targets,
+            ),
+        ]
+
+    async def _tool_get_runtime_capabilities(self) -> str:
+        driver = self._runtime_driver()
+        data = await asyncio.to_thread(driver.runtime_client.get_capabilities)
+        return json.dumps(data, ensure_ascii=False)
+
+    async def _tool_get_device_info(self) -> str:
+        data = await self._runtime_driver().get_device_info()
+        return json.dumps(data, ensure_ascii=False)
+
+    async def _tool_list_apps(self, query: str = "") -> str:
+        data = await self._runtime_driver().list_apps(query)
+        return json.dumps(data, ensure_ascii=False)
+
+    async def _tool_open_settings(self, target: str) -> str:
+        success = await self._runtime_driver().open_settings(target)
+        return json.dumps(
+            {"success": success, "target": target,
+             "message": "Opened Android Settings." if success
+             else "Android Settings target was unsupported or could not be opened."},
+            ensure_ascii=False,
+        )
 
     def _runtime_driver(self) -> Any:
         driver = get_driver(self.ctx)
