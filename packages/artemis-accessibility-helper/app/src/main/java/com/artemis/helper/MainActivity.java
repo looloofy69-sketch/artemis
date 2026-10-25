@@ -108,9 +108,18 @@ public class MainActivity extends Activity {
     }
 
     private void updateRootStatus() {
+        boolean tested = RootExecutor.wasRootProbePerformed(this);
         boolean available = RootExecutor.wasRootAvailable(this);
         boolean enabled = RootExecutor.isRootModeEnabled(this);
-        rootStatus.setText("Root detected: " + (available ? "yes" : "not verified / unavailable")
+        String rootAvailability;
+        if (!tested) {
+            rootAvailability = "not tested yet";
+        } else if (available) {
+            rootAvailability = "verified";
+        } else {
+            rootAvailability = "unavailable (test failed)";
+        }
+        rootStatus.setText("Root access: " + rootAvailability
                 + "\nRoot Mode: " + (enabled ? "ENABLED" : "disabled"));
         if (rootModeButton != null) {
             rootModeButton.setText(enabled ? "Disable root mode" : "Enable root mode");
