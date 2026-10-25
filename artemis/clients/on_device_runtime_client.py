@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import os
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 import urllib.error
 import urllib.request
 from typing import Any
@@ -64,11 +64,11 @@ class OnDeviceRuntimeManager:
             serial=serial,
             local_port=self.port,
             transport_id=None,
-            version_code=7,
-            version_name="1.3.0",
+            version_code=8,
+            version_name="1.3.1",
             owns_forward=False,
             token=self.token,
-            protocol_version=3,
+            protocol_version=2,
         )
 
     def reattach(self, serial: str) -> HelperSession:
@@ -116,6 +116,7 @@ class OnDeviceRuntimeClient(AccessibilityClient):
         if not payload.get("success"):
             self._session = None
             raise HelperUnavailable("ARTEMIS Runtime did not confirm its capabilities.")
+        self.runtime_capabilities = payload
         logger.info(
             f"Connected to the phone-local ARTEMIS Runtime at 127.0.0.1:{self._session.local_port}."
         )
@@ -150,6 +151,51 @@ class OnDeviceRuntimeClient(AccessibilityClient):
         if not snapshot.get("has_screenshot") or not snapshot.get("screenshot_base64"):
             return None
         return Image.open(BytesIO(base64.b64decode(snapshot["screenshot_base64"]))).copy()
+
+    def get_capabilities(self) -> dict[str, Any]:
+        """Return authenticated runtime capability metadata."""
+        data = json.loads(self._http("/capabilities").decode("utf-8"))
+        if not isinstance(data, dict) or not data.get("success"):
+            raise HelperUnavailable("ARTEMIS Runtime capability discovery failed.")
+        self.runtime_capabilities = data
+        return data
+
+    def get_device_info(self) -> dict[str, Any]:
+        """Read device/runtime diagnostics without ADB or shell access."""
+        data = json.loads(self._http("/device").decode("utf-8"))
+        if not isinstance(data, dict) or not data.get("success"):
+            raise HelperUnavailable(
+                f"ARTEMIS Runtime device diagnostics failed: "
+                f"{data.get('error', 'invalid response') if isinstance(data, dict) else 'invalid response'}"
+            )
+        return data
+
+    def list_apps(self, query: str = "") -> dict[str, Any]:
+        """List launchable apps only; Android package visibility limits the inventory."""
+        path = "/apps"
+        if query.strip():
+            path += "?q=" + quote(query.strip(), safe="")
+        data = json.loads(self._http(path).decode("utf-8"))
+        if not isinstance(data, dict) or not data.get("success"):
+            raise HelperUnavailable(
+                f"ARTEMIS Runtime app discovery failed: "
+                f"{data.get('error', 'invalid response') if isinstance(data, dict) else 'invalid response'}"
+            )
+        if not isinstance(data.get("apps"), list):
+            raise HelperUnavailable("ARTEMIS Runtime returned an invalid app inventory.")
+        return data
+
+    def open_settings(self, target: str) -> bool:
+        """Open a whitelisted Android Settings page; the user controls any changes."""
+        return self._rpc("open_settings", {"target": target})
+
+    def open_link(self, url: str) -> bool:
+        """Open a web URL using Android's normal activity resolver."""
+        return self._rpc("open_link", {"url": url})
+
+    def erase_one_char(self) -> bool:
+        """Delete one code point from a focused non-password text field."""
+        return self._rpc("erase_one_char", {})
 
     def _ensure_session(self) -> HelperSession:
         if self._session is None:
