@@ -275,7 +275,7 @@ public class CommandServer extends Thread {
                 capabilities.put("requires_adb_for_core_ui", false);
                 capabilities.put("screenshot_min_sdk", 30);
                 capabilities.put("force_stop_supported", false);
-                capabilities.put("arbitrary_root_shell_supported", true);
+                capabilities.put("root_execution_endpoint_present", true);
                 sendJson(output, 200, capabilities.toString());
                 return;
             }
