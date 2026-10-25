@@ -180,12 +180,22 @@ Replace both credential placeholders with real values in your private shell. Do 
 
 **True privileged/system-app access:** on stock Android, an ordinary installed APK cannot grant itself signature/privileged permissions. A system-signed or privileged deployment requires a compatible custom/system image and its permission allowlist (or a separately provisioned enterprise device-owner configuration for the device-policy capabilities it supports). The current app does not modify the system partition, unlock the bootloader, root the phone, or bypass Xiaomi/Android security.
 
-### Current prototype limits
+### Native runtime capabilities and MCP tools
 
-- The runtime's direct Python client avoids ADB pairing for its main UI screen/action path, but this integration has **not yet been exercised on a real phone**.
-- The Pro/Flash agent may call other legacy ADB-backed operations; only the core on-device driver path has been redirected. Validate the first read-only task and treat any residual ADB call as a specific gap to fix.
-- Screen video recording via scrcpy and installing other APKs from the Python driver are not provided by phone-local mode yet. Video tools are disabled by the setup command above.
-- A successful APK build is not the same as a successful install, permission grant, loopback connection, or end-to-end automation. Verify each milestone separately.
+The root-enabled development branch now routes ARTEMIS's MCP action layer through a first-party `OnDeviceRuntimeActuator` when `ARTEMIS_ON_DEVICE_RUNTIME=1`. The canonical action schemas remain shared with the usual actuator; the device-control path for this mode uses the phone's local AccessibilityService endpoint rather than an ADB-forwarded helper.
+
+Supported phone-local tools include the standard click/long-press/swipe/text/global-action actions, app launch by visible launcher label or package name, opening HTTP(S) links, clearing text, and deleting one Unicode code point from a focused **non-password** editable field. The phone-local MCP backend additionally advertises:
+
+- `get_runtime_capabilities` — read what this runtime build reports it can do.
+- `get_device_info` — Android release/SDK, device model, screen dimensions/rotation, ABIs and foreground activity/package.
+- `list_apps` — discover launchable apps exposed by Android's package-visibility rules; this is not an inventory of hidden/non-launchable packages.
+- `open_settings` — navigate to an allowlisted Settings page (Accessibility, applications, display, Wi-Fi, Bluetooth, developer options, location, notifications, sound or date/time). The person still confirms changes in Android Settings.
+
+The native API rejects out-of-display touch coordinates and bounds gesture duration. Key actions are deliberately limited: Home/Back/Recents/notifications/quick settings and other declared Accessibility global actions work where Android permits them; Enter invokes the focused field's IME action only on Android 11+; Delete is refused for password or non-focused fields.
+
+**Still unavailable without ADB/root or extra Android provisioning:** arbitrary shell commands, force-stop, silently granting permissions, controlling secure/hidden surfaces, and video recording through scrcpy. Android's screenshot API requires Android 11+ and can still be denied. ARTEMIS does not gain root because the Root Mode button exists; this phone's root probe reported unavailable, so root commands should be treated as unavailable. App listing and app launch availability also depend on OEM/package visibility policy.
+
+This is an experimental integration. The APK compiling does not validate the MCP path on the actual phone: verify runtime capability discovery, diagnostics, one harmless app launch, read-only screen observation, and one reversible gesture before running any model-driven multi-step task. If a model/tool calls an unsupported capability, the correct result is a typed failure rather than falling back to an unpaired ADB command.
 
 
 ### Play Protect and debug build
