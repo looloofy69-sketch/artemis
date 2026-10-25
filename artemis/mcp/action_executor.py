@@ -45,6 +45,7 @@ from artemis.mcp.action_specs import exception_prefix
 from artemis.mcp.action_session import ActionSession, get_action_session
 from artemis.mcp.action_types import ActionCode, ActionResult
 from artemis.mcp.actuators.adb import AdbActuator
+from artemis.mcp.actuators.factory import create_actuator
 from artemis.agents.validator.tool_declarations import (
     ToolExecutionResult,
     normalize_coordinate_target,
@@ -93,7 +94,7 @@ class McpActionExecutor:
         agent_name: str = "validator",
     ):
         self.ctx = ctx
-        self.actuator = actuator or getattr(ctx, "actuator", None) or AdbActuator(ctx, controller)
+        self.actuator = actuator or getattr(ctx, "actuator", None) or create_actuator(ctx, controller)
         self.controller = self.actuator.controller
         # Identifies the calling agent / profile to the Explorer tier resolver
         # (``explorer.flash_mode`` vs ``explorer.pro_mode``); the agent itself
