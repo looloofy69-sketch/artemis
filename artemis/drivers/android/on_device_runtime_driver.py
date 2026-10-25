@@ -49,7 +49,20 @@ class OnDeviceRuntimeDriver(AndroidAdbDriver):
 
     async def connect(self) -> None:
         await asyncio.to_thread(self.runtime_client.connect)
-        logger.info("Connected using phone-local ARTEMIS Runtime; no ADB device is required.")
+        # Trust device-reported metrics over configuration defaults so normalized
+        # actions map correctly on the first call (including portrait/landscape).
+        try:
+            info = await asyncio.to_thread(self.runtime_client.get_device_info)
+            width = int(info.get("screen_width") or self._width)
+            height = int(info.get("screen_height") or self._height)
+            if width > 0 and height > 0:
+                self._width, self._height = width, height
+        except Exception as exc:
+            logger.warning(f"Could not read native display metrics; keeping defaults: {exc}")
+        logger.info(
+            f"Connected using phone-local ARTEMIS Runtime; screen={self._width}x{self._height}; "
+            "no ADB device is required."
+        )
 
     async def get_screen_data(self, skip_settling: bool = False) -> ScreenData:
         """Return a screenshot and hierarchy exclusively from the on-device Runtime."""
@@ -124,8 +137,8 @@ class OnDeviceRuntimeDriver(AndroidAdbDriver):
         }
         if name in global_actions:
             return bool(self.runtime_client._rpc("global", {"action": global_actions[name]}))
-        if name == "delete":
-            return await self.erase_one_char()
+        if name in {"delete", "enter", "ime_enter"}:
+            return await asyncio.to_thread(self.runtime_client.press_key, name)
         # Non-global key events require shell input, which is intentionally not
         # simulated as a privileged operation on stock Android.
         logger.warning(f"Key action '{name}' is not supported in non-root runtime mode.")
