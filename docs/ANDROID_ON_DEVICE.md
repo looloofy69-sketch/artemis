@@ -176,7 +176,7 @@ Replace both credential placeholders with real values in your private shell. Do 
 
 **Stock Android, no root:** the app can use the AccessibilityService APIs after you explicitly enable the service. The intended first tier includes hierarchy/screenshot capture (screenshot API requires Android 11+ and can still be denied), taps, swipes, supported global actions, text/clipboard operations, and launching an installed app. This is not unrestricted system access; password-protected/secure surfaces, OS restrictions, and apps that hide accessibility content remain limitations.
 
-**Rooted Android:** the app offers **Test root access** and a separate **Root Mode** switch. Root Mode is off by default; the user must test/approve the device's existing `su` prompt and then explicitly enable it. Only then can the authenticated local API invoke `su -c` commands. ARTEMIS cannot grant itself root, and the app must never silently enable this tier. An arbitrary root shell can damage the OS or erase user data; enable it only on a device you own and while intentionally supervising the operation.
+**Rooted Android:** the standard APK deliberately does **not** include arbitrary root-shell execution. That capability was removed from the installable standard build during the Play Protect hardening pass. A separate root-enabled build would need its own review, explicit user opt-in, and test path; do not assume it is present in the standard artifact.
 
 **True privileged/system-app access:** on stock Android, an ordinary installed APK cannot grant itself signature/privileged permissions. A system-signed or privileged deployment requires a compatible custom/system image and its permission allowlist (or a separately provisioned enterprise device-owner configuration for the device-policy capabilities it supports). The current app does not modify the system partition, unlock the bootloader, root the phone, or bypass Xiaomi/Android security.
 
@@ -186,3 +186,8 @@ Replace both credential placeholders with real values in your private shell. Do 
 - The Pro/Flash agent may call other legacy ADB-backed operations; only the core on-device driver path has been redirected. Validate the first read-only task and treat any residual ADB call as a specific gap to fix.
 - Screen video recording via scrcpy and installing other APKs from the Python driver are not provided by phone-local mode yet. Video tools are disabled by the setup command above.
 - A successful APK build is not the same as a successful install, permission grant, loopback connection, or end-to-end automation. Verify each milestone separately.
+
+
+### Play Protect and debug build
+
+The CI APK is a development artifact, not a store-reviewed or production-signed release. The standard build excludes the root-shell executor, but it still uses an AccessibilityService and local UI-control API, so this change **cannot guarantee** Play Protect will accept it. Keep Play Protect enabled. Check the exact warning; if Google explicitly labels the app harmful, do not bypass the warning—verify the artifact source/hash and submit a false-positive appeal through Google's official Play Protect/App verification support flow. The APK build passing does not mean Google has classified the app as safe.
