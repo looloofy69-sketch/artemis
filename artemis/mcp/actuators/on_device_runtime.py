@@ -26,7 +26,7 @@ class OnDeviceRuntimeActuator(AdbActuator):
 
     def extensions(self) -> list[ExtensionTool]:
         """Additional read-only discovery tools and safe Settings navigation."""
-        targets = frozenset({"operator", "flash", "validator"})
+        targets = frozenset({"flash", "validator"})
         return [
             ExtensionTool(
                 name="get_runtime_capabilities",
