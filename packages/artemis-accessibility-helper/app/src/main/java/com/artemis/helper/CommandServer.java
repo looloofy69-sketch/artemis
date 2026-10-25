@@ -380,6 +380,22 @@ public class CommandServer extends Thread {
                     return openSettings(params.optString("target", ""));
                 case "open_link":
                     return openLink(params.optString("url", ""));
+                case "press_key": {
+                    String key = params.optString("key", "").trim().toLowerCase(Locale.ROOT);
+                    boolean supported = false;
+                    if ("enter".equals(key) || "ime_enter".equals(key)) {
+                        supported = GestureController.pressImeEnter(service);
+                    } else if ("delete".equals(key)) {
+                        supported = GestureController.eraseOneChar(service);
+                    }
+                    resp.put("success", supported);
+                    if (!supported) {
+                        resp.put("error",
+                                "Unsupported key action or no focused non-password editable field. " +
+                                "Supported text keys: enter (Android 11+), delete.");
+                    }
+                    break;
+                }
                 case "erase_one_char":
                     resp.put("success", GestureController.eraseOneChar(service));
                     break;
