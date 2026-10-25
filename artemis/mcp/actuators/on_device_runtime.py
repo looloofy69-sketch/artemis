@@ -275,7 +275,6 @@ class OnDeviceRuntimeActuator(AdbActuator):
         return ActionResult.success("press_key", f"Executed supported key/global action '{value}'.")
 
     async def manage_app(self, action: str, app_name: str) -> ActionResult:
-        driver = self._runtime_driver()
         operation = str(action).strip().lower()
         requested = str(app_name).strip()
         if operation == "stop":
@@ -289,6 +288,7 @@ class OnDeviceRuntimeActuator(AdbActuator):
                 "manage_app", "Use action='launch' and provide an app label or package.",
                 code=ActionCode.INVALID_ARGS,
             )
+        driver = self._runtime_driver()
         try:
             inventory = await driver.list_apps(requested)
             apps = inventory.get("apps", [])
